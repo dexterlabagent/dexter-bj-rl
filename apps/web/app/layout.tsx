@@ -1,6 +1,5 @@
-import { ClerkProvider } from '@clerk/nextjs';
 import { RootLayout } from '@repo/common/components';
-import { ReactQueryProvider, RootProvider } from '@repo/common/context';
+import { ReactQueryProvider, RootProvider, WalletAuthProvider } from '@repo/common/context';
 import { TooltipProvider, cn } from '@repo/ui';
 import { GeistMono } from 'geist/font/mono';
 import type { Viewport } from 'next';
@@ -16,7 +15,8 @@ const bricolage = Bricolage_Grotesque({
 import './globals.css';
 
 export const metadata: Metadata = {
-    title: 'llmchat.co - Go Deeper with AI-Powered Research & Agentic Workflows',
+    metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://delph.ai'),
+    title: 'Delph - Go Deeper with AI-Powered Research & Agentic Workflows',
     description:
         'Experience deep, AI-powered research with agentic workflows and a wide variety of models for advanced productivity.',
     keywords: 'AI chat, LLM, language models, privacy, minimal UI, ollama, chatgpt',
@@ -24,30 +24,30 @@ export const metadata: Metadata = {
     creator: 'Trendy design',
     publisher: 'Trendy design',
     openGraph: {
-        title: 'llmchat.co - Go Deeper with AI-Powered Research & Agentic Workflows',
-        siteName: 'llmchat.co',
+        title: 'Delph - Go Deeper with AI-Powered Research & Agentic Workflows',
+        siteName: 'Delph',
         description:
             'Experience deep, AI-powered research with agentic workflows and a wide variety of models for advanced productivity.',
-        url: 'https://llmchat.co',
+        url: 'https://delph.ai',
         type: 'website',
         locale: 'en_US',
         images: [
             {
-                url: 'https://llmchat.co/og-image.jpg',
+                url: 'https://delph.ai/og-image.jpg',
                 width: 1200,
                 height: 630,
-                alt: 'LLMChat Preview',
+                alt: 'Delph Preview',
             },
         ],
     },
     twitter: {
         card: 'summary_large_image',
-        title: 'llmchat.co - Go Deeper with AI-Powered Research & Agentic Workflows',
-        site: 'llmchat.co',
-        creator: '@llmchat_co',
+        title: 'Delph - Go Deeper with AI-Powered Research & Agentic Workflows',
+        site: 'Delph',
+        creator: '@delph_ai',
         description:
             'Experience deep, AI-powered research with agentic workflows and a wide variety of models for advanced productivity.',
-        images: ['https://llmchat.co/twitter-image.jpg'],
+        images: ['https://delph.ai/twitter-image.jpg'],
     },
     robots: {
         index: true,
@@ -61,15 +61,15 @@ export const metadata: Metadata = {
         },
     },
     alternates: {
-        canonical: 'https://llmchat.co',
+        canonical: 'https://delph.ai',
     },
 };
 
 export const viewport: Viewport = {
     width: 'device-width',
     initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
+    maximumScale: 5,
+    userScalable: true,
 };
 
 const inter = localFont({
@@ -90,7 +90,7 @@ export default function ParentLayout({
     return (
         <html
             lang="en"
-            className={cn(GeistMono.variable, inter.variable, clash.variable, bricolage.variable)}
+            className={cn(GeistMono.variable, inter.variable, clash.variable, bricolage.variable, 'dark')}
             suppressHydrationWarning
         >
             <head>
@@ -103,7 +103,7 @@ export default function ParentLayout({
             </head>
             <body>
                 {/* <PostHogProvider> */}
-                <ClerkProvider>
+                <WalletAuthProvider>
                     <RootProvider>
                         {/* <ThemeProvider
             attribute="class"
@@ -118,7 +118,7 @@ export default function ParentLayout({
                         </TooltipProvider>
                         {/* </ThemeProvider> */}
                     </RootProvider>
-                </ClerkProvider>
+                </WalletAuthProvider>
                 {/* </PostHogProvider> */}
             </body>
         </html>
