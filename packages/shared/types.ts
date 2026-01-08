@@ -85,3 +85,13 @@ export type MessageGroup = {
     userMessage: ThreadItem;
     assistantMessages: ThreadItem[];
 };
+
+export type Character = {
+    id: string;
+    name: string;
+    description: string;
+    instructions: string;
+    emoji: string;
+    createdAt: Date;
+    updatedAt: Date;
+};
