@@ -2,7 +2,7 @@
 
 import { Model, models } from '@repo/ai/models';
 import { ChatMode } from '@repo/shared/config';
-import { MessageGroup, Thread, ThreadItem } from '@repo/shared/types';
+import { Character, MessageGroup, Thread, ThreadItem } from '@repo/shared/types';
 import Dexie, { Table } from 'dexie';
 import { nanoid } from 'nanoid';
 import { create } from 'zustand';
@@ -68,6 +68,8 @@ type State = {
     chatMode: ChatMode;
     context: string;
     imageAttachment: { base64?: string; file?: File };
+    documentContext: { text: string; fileName: string } | null;
+    activeCharacter: Character | null;
     abortController: AbortController | null;
     threads: Thread[];
     threadItems: ThreadItem[];
@@ -95,6 +97,9 @@ type Actions = {
     fetchRemainingCredits: () => Promise<void>;
     setImageAttachment: (imageAttachment: { base64?: string; file?: File }) => void;
     clearImageAttachment: () => void;
+    setDocumentContext: (doc: { text: string; fileName: string }) => void;
+    clearDocumentContext: () => void;
+    setActiveCharacter: (character: Character | null) => void;
     setIsGenerating: (isGenerating: boolean) => void;
     stopGeneration: () => void;
     setAbortController: (abortController: AbortController) => void;
@@ -235,7 +240,18 @@ const initializeWorker = () => {
 
     try {
         // Create a shared worker
-        dbWorker = new SharedWorker(new URL('./db-sync.worker.ts', import.meta?.url), {
+        // Access import.meta properties directly (not the object itself) to avoid Next.js warnings
+        const workerUrl = typeof import.meta !== 'undefined' && import.meta.url
+            ? new URL('./db-sync.worker.ts', import.meta.url)
+            : null;
+
+        if (!workerUrl) {
+            console.warn('Worker URL could not be determined, falling back to localStorage sync');
+            initializeTabSync();
+            return;
+        }
+
+        dbWorker = new SharedWorker(workerUrl, {
             type: 'module',
         });
 
@@ -432,6 +448,8 @@ const notifyWorker = (type: string, data: any) => {
 // Create a debounced version of the notification function
 const debouncedNotify = debounce(notifyWorker, 300);
 
+export type ChatStore = State & Actions;
+
 export const useChatStore = create(
     immer<State & Actions>((set, get) => ({
         model: models[0],
@@ -448,6 +466,8 @@ export const useChatStore = create(
         currentThread: null,
         currentThreadItem: null,
         imageAttachment: { base64: undefined, file: undefined },
+        documentContext: null,
+        activeCharacter: null,
         messageGroups: [],
         abortController: null,
         isLoadingThreads: false,
@@ -482,6 +502,24 @@ export const useChatStore = create(
         clearImageAttachment: () => {
             set(state => {
                 state.imageAttachment = { base64: undefined, file: undefined };
+            });
+        },
+
+        setDocumentContext: (doc: { text: string; fileName: string }) => {
+            set(state => {
+                state.documentContext = doc;
+            });
+        },
+
+        clearDocumentContext: () => {
+            set(state => {
+                state.documentContext = null;
+            });
+        },
+
+        setActiveCharacter: (character: Character | null) => {
+            set(state => {
+                state.activeCharacter = character;
             });
         },
 
