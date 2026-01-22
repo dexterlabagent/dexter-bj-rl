@@ -1,4 +1,4 @@
-import { useAuth, useUser } from '@clerk/nextjs';
+import { useAuth, useUser } from '@repo/common/context';
 import { useWorkflowWorker } from '@repo/ai/worker';
 import { ChatMode, ChatModeConfig } from '@repo/shared/config';
 import { ThreadItem } from '@repo/shared/types';
@@ -40,6 +40,8 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         chatMode,
         fetchRemainingCredits,
         customInstructions,
+        documentContext,
+        activeCharacter,
     } = useChatStore(state => ({
         updateThreadItem: state.updateThreadItem,
         setIsGenerating: state.setIsGenerating,
@@ -51,6 +53,8 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         chatMode: state.chatMode,
         fetchRemainingCredits: state.fetchRemainingCredits,
         customInstructions: state.customInstructions,
+        documentContext: state.documentContext,
+        activeCharacter: state.activeCharacter,
     }));
     const { push } = useRouter();
 
@@ -58,6 +62,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
     const apiKeys = useApiKeysStore(state => state.getAllKeys);
     const hasApiKeyForChatMode = useApiKeysStore(state => state.hasApiKeyForChatMode);
     const setShowSignInModal = useAppStore(state => state.setShowSignInModal);
+    const setIsSettingsOpen = useAppStore(state => state.setIsSettingsOpen);
 
     // Fetch remaining credits when user changes
     useEffect(() => {
@@ -361,6 +366,14 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
                 return;
             }
 
+            if (
+                !!ChatModeConfig[mode as keyof typeof ChatModeConfig]?.requiresApiKey &&
+                !hasApiKeyForChatMode(mode)
+            ) {
+                setIsSettingsOpen(true);
+                return;
+            }
+
             const threadId = currentThreadId?.toString() || newThreadId;
             if (!threadId) return;
 
@@ -400,6 +413,14 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
                 imageAttachment,
             });
 
+            // Character instructions take precedence over custom instructions
+            const baseInstructions = activeCharacter?.instructions || customInstructions;
+
+            // Prepend document context if a document is attached
+            const effectiveInstructions = documentContext
+                ? `The user has attached a document titled "${documentContext.fileName}". Use the following document content to answer their questions:\n\n<document>\n${documentContext.text.slice(0, 80000)}\n</document>\n\n${baseInstructions || ''}`
+                : baseInstructions;
+
             if (hasApiKeyForChatMode(mode)) {
                 const abortController = new AbortController();
                 setAbortController(abortController);
@@ -420,7 +441,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
                     mcpConfig: getSelectedMCP(),
                     threadItemId: optimisticAiThreadItemId,
                     parentThreadItemId: '',
-                    customInstructions,
+                    customInstructions: effectiveInstructions,
                     apiKeys: apiKeys(),
                 });
             } else {
@@ -431,7 +452,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
                     messages: coreMessages,
                     mcpConfig: getSelectedMCP(),
                     threadItemId: optimisticAiThreadItemId,
-                    customInstructions,
+                    customInstructions: effectiveInstructions,
                     parentThreadItemId: '',
                     webSearch: useWebSearch,
                     showSuggestions: showSuggestions ?? true,
@@ -443,6 +464,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
             currentThreadId,
             chatMode,
             setShowSignInModal,
+            setIsSettingsOpen,
             updateThread,
             createThreadItem,
             setCurrentThreadItem,
@@ -451,6 +473,8 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
             abortWorkflow,
             startWorkflow,
             customInstructions,
+            documentContext,
+            activeCharacter,
             getSelectedMCP,
             apiKeys,
             hasApiKeyForChatMode,
