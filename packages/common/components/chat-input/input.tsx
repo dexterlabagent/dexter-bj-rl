@@ -1,5 +1,5 @@
 'use client';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth } from '@repo/common/context';
 import {
     ImageAttachment,
     ImageDropzoneRoot,
@@ -7,14 +7,15 @@ import {
 } from '@repo/common/components';
 import { useImageAttachment } from '@repo/common/hooks';
 import { ChatModeConfig } from '@repo/shared/config';
-import { cn, Flex } from '@repo/ui';
+import { Button, cn, Flex, Tooltip } from '@repo/ui';
+import { IconFileText, IconX } from '@tabler/icons-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import React, { useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { useShallow } from 'zustand/react/shallow';
 import { useAgentStream } from '../../hooks/agent-provider';
 import { useChatEditor } from '../../hooks/use-editor';
+import { useDocumentAttachment } from '../../hooks/use-document-attachment';
 import { useChatStore } from '../../store';
 import { ExamplePrompts } from '../exmaple-prompts';
 import { ChatModeButton, GeneratingStatus, SendStopButton, WebSearchButton } from './chat-actions';
@@ -36,7 +37,7 @@ export const ChatInput = ({
     const { editor } = useChatEditor({
         placeholder: isFollowUp ? 'Ask follow up' : 'Ask anything',
         onInit: ({ editor }) => {
-            if (typeof window !== 'undefined' && !isFollowUp && !isSignedIn) {
+            if (typeof window !== 'undefined' && !isFollowUp) {
                 const draftMessage = window.localStorage.getItem('draft-message');
                 if (draftMessage) {
                     editor.commands.setContent(draftMessage, true, { preserveWhitespace: true });
@@ -62,6 +63,9 @@ export const ChatInput = ({
     const stopGeneration = useChatStore(state => state.stopGeneration);
     const hasTextInput = !!editor?.getText();
     const { dropzonProps, handleImageUpload } = useImageAttachment();
+    const { documentContext, handleDocumentUpload, clearDocumentContext } = useDocumentAttachment();
+    const activeCharacter = useChatStore(state => state.activeCharacter);
+    const setActiveCharacter = useChatStore(state => state.setActiveCharacter);
     const { push } = useRouter();
     const chatMode = useChatStore(state => state.chatMode);
     const sendMessage = async () => {
@@ -80,7 +84,7 @@ export const ChatInput = ({
         let threadId = currentThreadId?.toString();
 
         if (!threadId) {
-            const optimisticId = uuidv4();
+            const optimisticId = crypto.randomUUID();
             push(`/chat/${optimisticId}`);
             createThread(optimisticId, {
                 title: editor?.getText(),
@@ -107,6 +111,7 @@ export const ChatInput = ({
         window.localStorage.removeItem('draft-message');
         editor.commands.clearContent();
         clearImageAttachment();
+        clearDocumentContext();
     };
 
     const renderChatInput = () => (
@@ -121,7 +126,7 @@ export const ChatInput = ({
                 <Flex
                     direction="col"
                     className={cn(
-                        'bg-background border-hard/50 shadow-subtle-sm relative z-10 w-full rounded-xl border'
+                        'bg-secondary border-border/60 shadow-subtle-sm relative z-10 w-full rounded-2xl border'
                     )}
                 >
                     <ImageDropzoneRoot dropzoneProps={dropzonProps}>
@@ -138,7 +143,35 @@ export const ChatInput = ({
                                     transition={{ duration: 0.15, ease: 'easeOut' }}
                                     className="w-full"
                                 >
+                                    {activeCharacter && (
+                                        <div className="border-border/50 mx-3 mt-2 flex items-center gap-2 rounded-lg border bg-violet-50 px-2.5 py-1.5 dark:bg-violet-950/30">
+                                            <span className="text-base leading-none">{activeCharacter.emoji}</span>
+                                            <span className="text-xs font-medium text-violet-700 dark:text-violet-300 flex-1">
+                                                {activeCharacter.name}
+                                            </span>
+                                            <button
+                                                onClick={() => setActiveCharacter(null)}
+                                                className="text-violet-400 hover:text-violet-600 shrink-0"
+                                            >
+                                                <IconX size={12} />
+                                            </button>
+                                        </div>
+                                    )}
                                     <ImageAttachment />
+                                    {documentContext && (
+                                        <div className="border-border/50 mx-3 mt-2 flex items-center gap-1.5 rounded-md border bg-blue-50 px-2.5 py-1.5 dark:bg-blue-950/30">
+                                            <IconFileText size={13} className="text-blue-500 shrink-0" />
+                                            <span className="text-xs text-blue-700 dark:text-blue-300 line-clamp-1 flex-1">
+                                                {documentContext.fileName}
+                                            </span>
+                                            <button
+                                                onClick={clearDocumentContext}
+                                                className="text-blue-400 hover:text-blue-600 shrink-0"
+                                            >
+                                                <IconX size={12} />
+                                            </button>
+                                        </div>
+                                    )}
                                     <Flex className="flex w-full flex-row items-end gap-0">
                                         <ChatEditor
                                             sendMessage={sendMessage}
@@ -148,7 +181,7 @@ export const ChatInput = ({
                                     </Flex>
 
                                     <Flex
-                                        className="border-border w-full gap-0 border-t border-dashed px-2 py-2"
+                                        className="border-border/50 w-full gap-0 border-t px-2 py-2"
                                         gap="none"
                                         items="center"
                                         justify="between"
@@ -167,6 +200,26 @@ export const ChatInput = ({
                                                     tooltip="Image Attachment"
                                                     showIcon={true}
                                                     handleImageUpload={handleImageUpload}
+                                                />
+                                                <Tooltip content="Attach PDF">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon-sm"
+                                                        onClick={() =>
+                                                            document
+                                                                .getElementById('pdf-attachment')
+                                                                ?.click()
+                                                        }
+                                                    >
+                                                        <IconFileText size={16} strokeWidth={2} />
+                                                    </Button>
+                                                </Tooltip>
+                                                <input
+                                                    type="file"
+                                                    id="pdf-attachment"
+                                                    accept="application/pdf"
+                                                    className="hidden"
+                                                    onChange={handleDocumentUpload}
                                                 />
                                             </Flex>
                                         )}
@@ -227,7 +280,7 @@ export const ChatInput = ({
                 className={cn(
                     'mx-auto flex w-full max-w-3xl flex-col items-start',
                     !threadItemsLength && 'justify-start',
-                    size === 'sm' && 'px-8'
+                    size === 'sm' && 'px-4 md:px-8'
                 )}
             >
                 <Flex
@@ -305,7 +358,7 @@ const AnimatedTitles = ({ titles = [] }: AnimatedTitlesProps) => {
                         duration: 0.8,
                         ease: 'easeInOut',
                     }}
-                    className="from-muted-foreground/50 via-muted-foreground/40 to-muted-foreground/20 bg-gradient-to-r bg-clip-text text-center text-[32px] font-semibold tracking-tight text-transparent"
+                    className="from-foreground/70 via-foreground/50 to-foreground/20 bg-gradient-to-r bg-clip-text text-center text-[32px] font-semibold tracking-tight text-transparent"
                 >
                     {greeting}
                 </motion.h1>

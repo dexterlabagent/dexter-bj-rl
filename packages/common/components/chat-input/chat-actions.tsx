@@ -1,7 +1,7 @@
 'use client';
-import { useUser } from '@clerk/nextjs';
+import { useUser } from '@repo/common/context';
 import { DotSpinner } from '@repo/common/components';
-import { useApiKeysStore, useChatStore } from '@repo/common/store';
+import { useApiKeysStore, useAppStore, useChatStore } from '@repo/common/store';
 import { CHAT_MODE_CREDIT_COSTS, ChatMode, ChatModeConfig } from '@repo/shared/config';
 import {
     Button,
@@ -18,6 +18,7 @@ import {
     IconArrowUp,
     IconAtom,
     IconChevronDown,
+    IconLock,
     IconNorthStar,
     IconPaperclip,
     IconPlayerStopFilled,
@@ -117,9 +118,26 @@ export const modelOptions = [
     {
         label: 'Claude 3.7 Sonnet',
         value: ChatMode.CLAUDE_3_7_SONNET,
-        // webSearch: true,
         icon: undefined,
         creditCost: CHAT_MODE_CREDIT_COSTS[ChatMode.CLAUDE_3_7_SONNET],
+    },
+    {
+        label: 'Gemini 2.5 Pro',
+        value: ChatMode.GEMINI_2_5_PRO,
+        icon: undefined,
+        creditCost: CHAT_MODE_CREDIT_COSTS[ChatMode.GEMINI_2_5_PRO],
+    },
+    {
+        label: 'Claude Haiku',
+        value: ChatMode.CLAUDE_HAIKU,
+        icon: undefined,
+        creditCost: CHAT_MODE_CREDIT_COSTS[ChatMode.CLAUDE_HAIKU],
+    },
+    {
+        label: 'Llama 3.3 70B',
+        value: ChatMode.LLAMA_3_3_70B,
+        icon: undefined,
+        creditCost: CHAT_MODE_CREDIT_COSTS[ChatMode.LLAMA_3_3_70B],
     },
 ];
 
@@ -222,6 +240,7 @@ export const ChatModeOptions = ({
 }) => {
     const { isSignedIn } = useUser();
     const hasApiKeyForChatMode = useApiKeysStore(state => state.hasApiKeyForChatMode);
+    const setIsSettingsOpen = useAppStore(state => state.setIsSettingsOpen);
     const isChatPage = usePathname().startsWith('/chat');
     const { push } = useRouter();
     return (
@@ -233,12 +252,20 @@ export const ChatModeOptions = ({
             {isChatPage && (
                 <DropdownMenuGroup>
                     <DropdownMenuLabel>Advanced Mode</DropdownMenuLabel>
-                    {chatOptions.map(option => (
+                    {chatOptions.map(option => {
+                        const requiresApiKey = !!ChatModeConfig[option.value]?.requiresApiKey;
+                        const hasKey = hasApiKeyForChatMode(option.value);
+                        const isLocked = requiresApiKey && !hasKey;
+                        return (
                         <DropdownMenuItem
                             key={option.label}
                             onSelect={() => {
                                 if (ChatModeConfig[option.value]?.isAuthRequired && !isSignedIn) {
                                     push('/sign-in');
+                                    return;
+                                }
+                                if (isLocked) {
+                                    setIsSettingsOpen(true);
                                     return;
                                 }
                                 setChatMode(option.value);
@@ -255,12 +282,22 @@ export const ChatModeOptions = ({
                                             {option.description}
                                         </p>
                                     )}
+                                    {isLocked && (
+                                        <p className="text-amber-500 text-xs font-light">
+                                            Requires your own API key
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="flex-1" />
-                                {ChatModeConfig[option.value]?.isNew && <NewIcon />}
+                                {isLocked ? (
+                                    <IconLock size={13} className="text-amber-500 shrink-0" />
+                                ) : (
+                                    ChatModeConfig[option.value]?.isNew && <NewIcon />
+                                )}
                             </div>
                         </DropdownMenuItem>
-                    ))}
+                        );
+                    })}
                 </DropdownMenuGroup>
             )}
             <DropdownMenuGroup>
