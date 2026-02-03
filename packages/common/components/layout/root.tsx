@@ -11,8 +11,10 @@ import { AgentProvider } from '@repo/common/hooks';
 import { useAppStore } from '@repo/common/store';
 import { plausible } from '@repo/shared/utils';
 import { Badge, Button, Flex, Toaster } from '@repo/ui';
-import { IconMoodSadDizzy, IconX } from '@tabler/icons-react';
+import { IconMenu2, IconX } from '@tabler/icons-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import Image from 'next/image';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { FC, useEffect } from 'react';
 import { useStickToBottom } from 'use-stick-to-bottom';
@@ -23,26 +25,48 @@ export type TRootLayout = {
 };
 
 export const RootLayout: FC<TRootLayout> = ({ children }) => {
+    const pathname = usePathname();
+    const isLandingPage = pathname === '/';
     const { isSidebarOpen, isMobileSidebarOpen, setIsMobileSidebarOpen } = useRootContext();
     const setIsSettingOpen = useAppStore(state => state.setIsSettingsOpen);
 
     const containerClass =
-        'relative flex flex-1 flex-row h-[calc(99dvh)] border border-border rounded-sm bg-secondary w-full overflow-hidden shadow-sm';
+        'relative flex flex-1 flex-row h-[100dvh] bg-background w-full overflow-hidden';
 
     useEffect(() => {
         plausible.trackPageview();
     }, []);
 
+    if (isLandingPage) {
+        return (
+            <div className="min-h-screen w-full bg-background">
+                {children}
+                <Toaster />
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-tertiary flex h-[100dvh] w-full flex-row overflow-hidden">
-            <div className="bg-tertiary item-center fixed inset-0 z-[99999] flex justify-center md:hidden">
-                <div className="flex flex-col items-center justify-center gap-2">
-                    <IconMoodSadDizzy size={24} strokeWidth={2} className="text-muted-foreground" />
-                    <span className="text-muted-foreground text-center text-sm">
-                        Mobile version is coming soon.
-                        <br /> Please use a desktop browser.
-                    </span>
-                </div>
+        <div className="bg-background flex h-[100dvh] w-full flex-row overflow-hidden">
+            {/* Mobile Header */}
+            <div className="bg-background border-border fixed left-0 right-0 top-0 z-[60] flex h-12 items-center justify-between border-b px-3 lg:hidden">
+                <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setIsMobileSidebarOpen(true)}
+                >
+                    <IconMenu2 size={20} strokeWidth={2} />
+                </Button>
+                <Link href="/chat">
+                    <Image
+                        src="/delph-logo.png"
+                        alt="Delph"
+                        width={20}
+                        height={20}
+                        className="h-5 w-auto object-contain"
+                    />
+                </Link>
+                <div className="w-8" />
             </div>
             <Flex className="hidden lg:flex">
                 <AnimatePresence>{isSidebarOpen && <Sidebar />}</AnimatePresence>
@@ -65,8 +89,8 @@ export const RootLayout: FC<TRootLayout> = ({ children }) => {
             </Drawer.Root>
 
             {/* Main Content */}
-            <Flex className="flex-1 overflow-hidden">
-                <motion.div className="flex w-full py-1 pr-1">
+            <Flex className="flex-1 overflow-hidden pt-12 lg:pt-0">
+                <motion.div className="flex w-full">
                     <AgentProvider>
                         <div className={containerClass}>
                             <div className="relative flex h-full w-0 flex-1 flex-row">
@@ -115,7 +139,7 @@ export const SideDrawer = () => {
                         damping: 30,
                         exit: { duration: 0.2 },
                     }}
-                    className="flex min-h-[99dvh] w-[500px] shrink-0 flex-col overflow-hidden py-1.5 pl-0.5 pr-1.5"
+                    className="flex min-h-[99dvh] w-full md:w-[400px] lg:w-[500px] shrink-0 flex-col overflow-hidden py-1.5 pl-0.5 pr-1.5"
                 >
                     <div className="bg-background border-border shadow-subtle-xs flex h-full w-full flex-col overflow-hidden rounded-lg">
                         <div className="border-border flex flex-row items-center justify-between gap-2 border-b py-1.5 pl-4 pr-2">

@@ -1,4 +1,4 @@
-import { SignInButton, useAuth, UserButton } from '@clerk/nextjs';
+import { useAuth, useUser } from '@repo/common/context';
 import { FullPageLoader, HistoryItem } from '@repo/common/components';
 import { useRootContext } from '@repo/common/context';
 import { Thread, useAppStore, useChatStore } from '@repo/common/store';
@@ -6,6 +6,7 @@ import { Button, cn, Flex } from '@repo/ui';
 import { IconArrowBarLeft, IconArrowBarRight, IconPlus, IconSearch } from '@tabler/icons-react';
 import moment from 'moment';
 import { useParams, usePathname, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 export const Sidebar = () => {
     const { threadId: currentThreadId } = useParams();
@@ -14,7 +15,8 @@ export const Sidebar = () => {
     const { push } = useRouter();
     const isChatPage = pathname.startsWith('/chat');
     const threads = useChatStore(state => state.threads);
-    const { isSignedIn } = useAuth();
+    const { isSignedIn, signOut, walletAddress } = useAuth();
+    const { user } = useUser();
     const sortThreads = (threads: Thread[], sortBy: 'createdAt') => {
         return [...threads].sort((a, b) => moment(b[sortBy]).diff(moment(a[sortBy])));
     };
@@ -166,23 +168,30 @@ export const Sidebar = () => {
                     )}
                     <div className="sticky right-0 top-0 z-50 flex items-center gap-1 px-4 py-2">
                         {isSignedIn ? (
-                            <UserButton
-                                showName
-                                appearance={{
-                                    elements: {
-                                        avatarBox:
-                                            'size-6 bg-muted-foreground border border-border',
-                                        userButtonAvatarBox: 'bg-muted-foreground',
-                                        userPreviewAvatarIcon: 'bg-muted-foreground',
-                                    },
-                                }}
-                            />
-                        ) : (
-                            <SignInButton mode="modal">
-                                <Button variant="default" size="sm" rounded="full">
-                                    Log in
+                            <div className="flex items-center gap-2">
+                                <button
+                                    className="text-sm font-medium"
+                                    onClick={async () => {
+                                        if (!walletAddress) return;
+                                        await navigator.clipboard.writeText(walletAddress);
+                                        toast.success('Wallet address copied');
+                                    }}
+                                >
+                                    {user?.fullName}
+                                </button>
+                                <Button variant="ghost" size="sm" rounded="full" onClick={() => signOut()}>
+                                    Log out
                                 </Button>
-                            </SignInButton>
+                            </div>
+                        ) : (
+                            <Button
+                                variant="default"
+                                size="sm"
+                                rounded="full"
+                                onClick={() => push('/sign-in')}
+                            >
+                                Log in
+                            </Button>
                         )}
                     </div>
                 </Flex>

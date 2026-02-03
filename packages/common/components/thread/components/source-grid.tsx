@@ -16,7 +16,7 @@ export const SourceGrid = ({ sources }: SourceGridProps) => {
     const sortedSources = [...sources].sort((a, b) => a?.index - b?.index);
 
     return (
-        <div className="grid grid-cols-4 gap-2 pb-8 pt-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 pb-8 pt-2">
             {sortedSources.slice(0, 3).map((source, index) => (
                 <div
                     key={index}
