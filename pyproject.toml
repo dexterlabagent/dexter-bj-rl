@@ -1,0 +1,17 @@
+[project]
+name = "dexter-rl"
+version = "0.1.0"
+description = "Q-learning epsilon-greedy blackjack agent"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+dexter-rl = "dexter_rl.__main__:main"
