@@ -33,9 +33,11 @@ def commentary_action(
     brain: BrainState,
     drawn_card_str: str | None = None,
     new_total: int | None = None,
+    is_soft: bool = False,
 ) -> list[str]:
     lines: list[str] = []
-    key = f"[{player_total},{dealer_up}]"
+    soft_tag = "S" if is_soft else "H"
+    key = f"[{player_total},{dealer_up},{soft_tag}]"
 
     if explored:
         lines.append(
@@ -45,15 +47,38 @@ def commentary_action(
             ])}"
         )
     else:
-        w = brain.weights.get(f"{player_total}_{dealer_up}")
+        lookup = f"{player_total}_{dealer_up}_{'S' if is_soft else 'H'}"
+        w = brain.weights.get(lookup)
         if w:
-            total = w.hit + w.stand
-            p = (w.hit / total) if action == "hit" else (w.stand / total)
+            total = w.hit + w.stand + w.double
+            if action == "hit":
+                p = w.hit / total if total > 0 else 0.0
+            elif action == "stand":
+                p = w.stand / total if total > 0 else 0.0
+            else:
+                p = w.double / total if total > 0 else 0.0
             lines.append(f"[{table_name}] {key} -> {action.upper()} (p={p:.2f})")
         else:
             lines.append(f"[{table_name}] {key} -> {action.upper()}")
 
-    if action == "hit" and drawn_card_str:
+    if action == "double":
+        lines.append(
+            f"[{table_name}] {_pick([
+                f'DOUBLE DOWN at {key}. 2x bet committed. No going back.',
+                f'DOUBLE at {key}. The math checks out. Probably.',
+                f'DOUBLE at {key}! Maximum risk. Maximum reward.',
+            ])}"
+        )
+        if drawn_card_str:
+            lines.append(f"[{table_name}] Drew {drawn_card_str} -> {new_total}")
+            if new_total is not None and new_total > 21:
+                lines.append(
+                    f"[{table_name}] {_pick([
+                        'BUST on double. Lost 2x. This is unacceptable.',
+                        f'BUST at {new_total} on double. The math did NOT check out.',
+                    ])}"
+                )
+    elif action == "hit" and drawn_card_str:
         lines.append(f"[{table_name}] Drew {drawn_card_str} -> {new_total}")
         if new_total is not None and new_total > 21:
             lines.append(

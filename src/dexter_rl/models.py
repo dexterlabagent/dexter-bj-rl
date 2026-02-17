@@ -46,7 +46,7 @@ class GamePhase(str, Enum):
     RESOLVED = "resolved"
 
 
-Action = Literal["hit", "stand"]
+Action = Literal["hit", "stand", "double"]
 
 
 @dataclass
@@ -75,6 +75,7 @@ class Card:
 class ActionWeights:
     hit: float = 0.0
     stand: float = 0.0
+    double: float = 0.0
 
 
 @dataclass
@@ -142,6 +143,21 @@ def is_bust(cards: list[Card]) -> bool:
 
 def is_blackjack(cards: list[Card]) -> bool:
     return len(cards) == 2 and hand_value(cards) == 21
+
+
+def is_soft_hand(cards: list[Card]) -> bool:
+    """True if the hand contains a usable ace (counted as 11 without busting)."""
+    total = 0
+    aces = 0
+    for card in cards:
+        if card.rank == Rank.ACE:
+            total += 11
+            aces += 1
+        elif card.rank in (Rank.KING, Rank.QUEEN, Rank.JACK):
+            total += 10
+        else:
+            total += int(card.rank.value)
+    return aces > 0 and total <= 21
 
 
 def is_soft_17(cards: list[Card]) -> bool:

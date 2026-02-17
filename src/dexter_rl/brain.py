@@ -14,7 +14,13 @@ class DexterBrain:
     # ── Basic strategy prior ──
 
     @staticmethod
-    def basic_strategy_action(player_total: int, dealer_up: int) -> Action:
+    def basic_strategy_action(player_total: int, dealer_up: int, is_soft: bool = False) -> Action:
+        if is_soft:
+            if player_total >= 19:
+                return "stand"
+            if player_total == 18:
+                return "stand" if 2 <= dealer_up <= 8 else "hit"
+            return "hit"  # soft 17 and below always hit
         if player_total >= 17:
             return "stand"
         if player_total <= 11:
@@ -23,25 +29,31 @@ class DexterBrain:
             return "stand"
         return "hit"
 
-    def _init_weights(self, player_total: int, dealer_up: int) -> ActionWeights:
-        best = self.basic_strategy_action(player_total, dealer_up)
+    def _init_weights(self, player_total: int, dealer_up: int, is_soft: bool = False) -> ActionWeights:
+        best = self.basic_strategy_action(player_total, dealer_up, is_soft)
+        # Double is advantageous on 9-11 vs weak dealer
+        double_prior = 0.0
+        if player_total in (9, 10, 11) and not is_soft and dealer_up <= 9:
+            double_prior = 0.45 + random.random() * 0.1
         if best == "hit":
             return ActionWeights(
                 hit=0.6 + random.random() * 0.1,
                 stand=0.3 + random.random() * 0.1,
+                double=double_prior,
             )
         return ActionWeights(
             hit=0.3 + random.random() * 0.1,
             stand=0.6 + random.random() * 0.1,
+            double=double_prior,
         )
 
     @staticmethod
-    def state_key(player_total: int, dealer_up_value: int) -> str:
-        return f"{player_total}_{dealer_up_value}"
+    def state_key(player_total: int, dealer_up_value: int, is_soft: bool = False) -> str:
+        return f"{player_total}_{dealer_up_value}_{'S' if is_soft else 'H'}"
 
-    def ensure_weights(self, key: str, player_total: int, dealer_up: int) -> None:
+    def ensure_weights(self, key: str, player_total: int, dealer_up: int, is_soft: bool = False) -> None:
         if key not in self.state.weights:
-            self.state.weights[key] = self._init_weights(player_total, dealer_up)
+            self.state.weights[key] = self._init_weights(player_total, dealer_up, is_soft)
 
     # ── Bet decision (Kelly criterion) ──
 
@@ -62,16 +74,33 @@ class DexterBrain:
 
     # ── Action decision (epsilon-greedy) ──
 
-    def decide_action(self, player_total: int, dealer_up_value: int) -> tuple[Action, bool]:
-        key = self.state_key(player_total, dealer_up_value)
-        self.ensure_weights(key, player_total, dealer_up_value)
+    def decide_action(
+        self,
+        player_total: int,
+        dealer_up_value: int,
+        is_soft: bool = False,
+        num_cards: int = 2,
+    ) -> tuple[Action, bool]:
+        key = self.state_key(player_total, dealer_up_value, is_soft)
+        self.ensure_weights(key, player_total, dealer_up_value, is_soft)
+
+        can_double = num_cards == 2
 
         if random.random() < self.state.exploration_rate:
-            action: Action = random.choice(["hit", "stand"])
+            choices: list[Action] = ["hit", "stand"]
+            if can_double:
+                choices.append("double")
+            action: Action = random.choice(choices)
             return action, True
 
         w = self.state.weights[key]
-        action = "hit" if w.hit >= w.stand else "stand"
+        if can_double:
+            action = max(
+                [("hit", w.hit), ("stand", w.stand), ("double", w.double)],
+                key=lambda x: x[1],
+            )[0]
+        else:
+            action = "hit" if w.hit >= w.stand else "stand"
         return action, False
 
     # ── Weight update ──
@@ -86,12 +115,19 @@ class DexterBrain:
             w = self.state.weights.get(key)
             if w is None:
                 continue
-            current = w.hit if action == "hit" else w.stand
+            if action == "hit":
+                current = w.hit
+            elif action == "stand":
+                current = w.stand
+            else:
+                current = w.double
             updated = current + self.state.learning_rate * (reward - current)
             if action == "hit":
                 w.hit = updated
-            else:
+            elif action == "stand":
                 w.stand = updated
+            else:
+                w.double = updated
 
         self.state.iteration += 1
         self.state.learning_rate = self.config.initial_learning_rate / (
