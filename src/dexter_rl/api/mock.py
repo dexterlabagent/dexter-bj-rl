@@ -138,6 +138,19 @@ class MockGameClient(GameClient):
             )
             if hand_value(table.player_hand) > 21:
                 await self._resolve(table_id, RoundResult.PLAYER_BUST)
+        elif action == "double":
+            # Double the bet, draw exactly one card, then dealer plays
+            table.bet *= 2
+            card = table.draw()
+            table.player_hand.append(card)
+            await self._emit(
+                table_id,
+                CardDealt(table_id=table_id, card=card, recipient="player"),
+            )
+            if hand_value(table.player_hand) > 21:
+                await self._resolve(table_id, RoundResult.PLAYER_BUST)
+            else:
+                await self._dealer_play(table_id)
         else:
             # Stand -> dealer plays
             await self._dealer_play(table_id)

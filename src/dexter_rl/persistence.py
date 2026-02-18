@@ -28,7 +28,7 @@ def save_brain(brain: BrainState, config: DexterConfig) -> None:
     with open(data_dir / config.brain_file, "w") as f:
         json.dump(brain_data, f, indent=2)
 
-    weights_data = {k: {"hit": v.hit, "stand": v.stand} for k, v in brain.weights.items()}
+    weights_data = {k: {"hit": v.hit, "stand": v.stand, "double": v.double} for k, v in brain.weights.items()}
 
     with open(data_dir / config.qtable_file, "w") as f:
         json.dump(weights_data, f, indent=2)
@@ -50,7 +50,7 @@ def load_brain(config: DexterConfig) -> BrainState | None:
         with open(qtable_path) as f:
             raw = json.load(f)
             weights = {
-                k: ActionWeights(hit=v["hit"], stand=v["stand"])
+                k: ActionWeights(hit=v["hit"], stand=v["stand"], double=v.get("double", 0.0))
                 for k, v in raw.items()
             }
 

@@ -6,7 +6,7 @@ import signal
 
 from .brain import DexterBrain
 from .table import TableInstance
-from .models import BrainState, hand_value
+from .models import BrainState, hand_value, is_soft_hand
 from .api.client import GameClient
 from .api.mock import MockGameClient
 from .api.events import (
@@ -149,8 +149,11 @@ class Orchestrator:
             if player_total >= 21:
                 break
 
-            action, explored = self.brain.decide_action(player_total, dealer_up_value)
-            key = DexterBrain.state_key(player_total, dealer_up_value)
+            is_soft = is_soft_hand(player_cards)
+            action, explored = self.brain.decide_action(
+                player_total, dealer_up_value, is_soft, len(player_cards)
+            )
+            key = DexterBrain.state_key(player_total, dealer_up_value, is_soft)
             table.states_visited.append(key)
             table.actions_chosen.append(action)
 
@@ -166,6 +169,7 @@ class Orchestrator:
                     action, explored, self.brain.state,
                     drawn_card_str=card_event.card.display() if card_event.card else "?",
                     new_total=new_total,
+                    is_soft=is_soft,
                 ))
 
                 if new_total > 21:
@@ -179,11 +183,35 @@ class Orchestrator:
                     break
 
                 await asyncio.sleep(self.config.hit_delay)
+
+            elif action == "double":
+                # Draw exactly one card, then the hand is over
+                card_event = await self._wait_for(table_id, CardDealt)
+                player_cards.append(card_event.card)
+                new_total = hand_value(player_cards)
+
+                self._log_lines(commentary_action(
+                    table.casino_name, player_total, dealer_up_value,
+                    action, explored, self.brain.state,
+                    drawn_card_str=card_event.card.display() if card_event.card else "?",
+                    new_total=new_total,
+                    is_soft=is_soft,
+                ))
+
+                if new_total > 21:
+                    result = await self._wait_for(table_id, RoundResultEvent)
+                else:
+                    await self._drain_until(table_id, DealerReveal)
+                    result = await self._wait_for(table_id, RoundResultEvent)
+                await self._handle_result(slot, table, result)
+                return
+
             else:
                 # Stand
                 self._log_lines(commentary_action(
                     table.casino_name, player_total, dealer_up_value,
                     action, explored, self.brain.state,
+                    is_soft=is_soft,
                 ))
                 break
 
