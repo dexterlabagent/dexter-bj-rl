@@ -157,6 +157,10 @@ def is_soft_hand(cards: list[Card]) -> bool:
             total += 10
         else:
             total += int(card.rank.value)
+    # Reduce aces from 11 to 1 until we're under 21 — mirrors hand_value logic
+    while total > 21 and aces > 0:
+        total -= 10
+        aces -= 1
     return aces > 0 and total <= 21
 
 
