@@ -5,8 +5,7 @@
     "main": "./index.ts",
     "types": "./index.ts",
     "scripts": {
-        "lint": "eslint .",
-        "generate:component": "turbo gen react-component"
+        "lint": "eslint ."
     },
     "dependencies": {
         "@floating-ui/react": "^0.27.5",

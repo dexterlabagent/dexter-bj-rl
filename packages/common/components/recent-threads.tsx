@@ -35,7 +35,7 @@ export const RecentThreads = () => {
                     View all <IconArrowRight strokeWidth={1.5} size={14} />
                 </Button>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 {threads
                     ?.sort((a, b) => b.createdAt?.getTime() - a.createdAt?.getTime())
                     .map(thread => (

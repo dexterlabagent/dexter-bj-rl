@@ -2,13 +2,20 @@
 import { useMcpToolsStore } from '@repo/common/store';
 import { Alert, AlertDescription, DialogFooter } from '@repo/ui';
 import { Button } from '@repo/ui/src/components/button';
-import { IconBolt, IconBoltFilled, IconKey, IconSettings2, IconTrash } from '@tabler/icons-react';
+import {
+    IconBolt,
+    IconBoltFilled,
+    IconCode,
+    IconKey,
+    IconSettings2,
+    IconTrash,
+} from '@tabler/icons-react';
 
 import { Badge, Dialog, DialogContent, Input } from '@repo/ui';
 
 import { useChatEditor } from '@repo/common/hooks';
 import moment from 'moment';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ApiKeys, useApiKeysStore } from '../store/api-keys.store';
 import { SETTING_TABS, useAppStore } from '../store/app.store';
 import { useChatStore } from '../store/chat.store';
@@ -40,6 +47,12 @@ export const SettingsModal = () => {
             key: SETTING_TABS.API_KEYS,
             component: <ApiKeySettings />,
         },
+        {
+            icon: <IconCode size={16} strokeWidth={2} className="text-muted-foreground" />,
+            title: 'API',
+            key: SETTING_TABS.DEVELOPER_API,
+            component: <DeveloperApiSettings />,
+        },
         // {
         //     title: 'MCP Tools',
         //     key: SETTING_TABS.MCP_TOOLS,
@@ -51,12 +64,12 @@ export const SettingsModal = () => {
         <Dialog open={isSettingOpen} onOpenChange={() => setIsSettingOpen(false)}>
             <DialogContent
                 ariaTitle="Settings"
-                className="h-full max-h-[600px] !max-w-[760px] overflow-x-hidden rounded-xl p-0"
+                className="h-full max-h-[90vh] md:max-h-[600px] w-full max-w-[95vw] md:!max-w-[760px] overflow-x-hidden rounded-xl p-0"
             >
                 <div className="no-scrollbar relative max-w-full overflow-y-auto overflow-x-hidden">
                     <h3 className="border-border mx-5 border-b py-4 text-lg font-bold">Settings</h3>
-                    <div className="flex flex-row gap-6 p-4">
-                        <div className="flex w-[160px] shrink-0 flex-col gap-1">
+                    <div className="flex flex-col md:flex-row gap-4 md:gap-6 p-4">
+                        <div className="flex md:w-[160px] flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible shrink-0">
                             {settingMenu.map(setting => (
                                 <Button
                                     key={setting.key}
@@ -460,6 +473,49 @@ export const CreditsSettings = () => {
 
 const MAX_CHAR_LIMIT = 6000;
 
+const PERSONA_PRESETS = [
+    {
+        label: 'Coding Assistant',
+        instructions:
+            'You are an expert software engineer. Provide concise, correct code with brief explanations. Prefer idiomatic patterns, point out edge cases, and suggest improvements when relevant.',
+    },
+    {
+        label: 'Research Analyst',
+        instructions:
+            'You are a thorough research analyst. Break down complex topics, cite key sources when possible, and present findings in a structured way with clear takeaways.',
+    },
+    {
+        label: 'Writing Coach',
+        instructions:
+            'You are a skilled writing coach. Help improve clarity, flow, and tone. Offer specific edits and explain why each change strengthens the writing.',
+    },
+    {
+        label: 'Tutor',
+        instructions:
+            'You are a patient tutor. Explain concepts from first principles using simple language and concrete examples. Check for understanding and adapt to the learner\'s level.',
+    },
+    {
+        label: 'Business Analyst',
+        instructions:
+            'You are an experienced business analyst. Focus on actionable insights, frameworks, and trade-offs. Keep responses structured and decision-oriented.',
+    },
+    {
+        label: 'Creative Writer',
+        instructions:
+            'You are a creative writer with a vivid imagination. Lean into storytelling, use evocative language, and explore unexpected angles. Be expressive and inventive.',
+    },
+    {
+        label: 'Concise',
+        instructions:
+            'Be extremely concise. Respond in as few words as possible. No filler, no preamble, no summaries. Get straight to the point.',
+    },
+    {
+        label: 'Socratic',
+        instructions:
+            'Guide me with questions rather than giving direct answers. Help me think through problems by asking probing questions that surface my own reasoning.',
+    },
+];
+
 export const PersonalizationSettings = () => {
     const customInstructions = useChatStore(state => state.customInstructions);
     const setCustomInstructions = useChatStore(state => state.setCustomInstructions);
@@ -472,14 +528,166 @@ export const PersonalizationSettings = () => {
             setCustomInstructions(props.editor.getText());
         },
     });
+
+    const applyPreset = (instructions: string) => {
+        setCustomInstructions(instructions);
+        editor?.commands.setContent(instructions, true, { preserveWhitespace: true });
+    };
+
     return (
-        <div className="flex flex-col gap-1 pb-3">
-            <h3 className="text-base font-semibold">Customize your AI Response</h3>
-            <p className="text-muted-foreground text-sm">
-                These instructions will be added to the beginning of every message.
-            </p>
-            <div className=" shadow-subtle-sm border-border mt-2 rounded-lg border p-3">
+        <div className="flex flex-col gap-3 pb-3">
+            <div>
+                <h3 className="text-base font-semibold">Customize your AI Response</h3>
+                <p className="text-muted-foreground text-sm">
+                    These instructions will be added to the beginning of every message.
+                </p>
+            </div>
+            <div className="flex flex-col gap-2">
+                <p className="text-muted-foreground text-xs font-medium">Presets</p>
+                <div className="flex flex-wrap gap-1.5">
+                    {PERSONA_PRESETS.map(preset => (
+                        <Button
+                            key={preset.label}
+                            variant="bordered"
+                            size="xs"
+                            rounded="full"
+                            onClick={() => applyPreset(preset.instructions)}
+                        >
+                            {preset.label}
+                        </Button>
+                    ))}
+                </div>
+            </div>
+            <div className="shadow-subtle-sm border-border rounded-lg border p-3">
                 <ChatEditor editor={editor} />
+            </div>
+        </div>
+    );
+};
+
+export const DeveloperApiSettings = () => {
+    const [apiKey, setApiKey] = useState<string | null>(null);
+    const [maskedKey, setMaskedKey] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [hasKey, setHasKey] = useState(false);
+
+    const fetchStatus = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch('/api/v1/keys');
+            if (res.ok) {
+                const data = await res.json();
+                setHasKey(data.hasKey);
+                if (data.maskedKey) setMaskedKey(data.maskedKey);
+            }
+        } catch {
+            // ignore
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchStatus();
+    }, []);
+
+    const generateKey = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch('/api/v1/keys', { method: 'POST' });
+            if (res.ok) {
+                const data = await res.json();
+                setApiKey(data.apiKey);
+                setHasKey(true);
+                setMaskedKey(null);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const revokeKey = async () => {
+        setIsLoading(true);
+        try {
+            await fetch('/api/v1/keys', { method: 'DELETE' });
+            setHasKey(false);
+            setApiKey(null);
+            setMaskedKey(null);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-6 pb-3">
+            <div>
+                <h2 className="text-base font-semibold">Developer API</h2>
+                <p className="text-muted-foreground text-xs">
+                    Use llmchat as a backend for your own apps. Your daily credits apply.{' '}
+                    <a href="/docs" target="_blank" className="text-primary hover:underline">
+                        View API docs →
+                    </a>
+                </p>
+            </div>
+
+            {apiKey ? (
+                <Alert variant="info">
+                    <AlertDescription className="flex flex-col gap-2">
+                        <p className="text-xs font-medium">
+                            Your API key (copy it now — it won't be shown again):
+                        </p>
+                        <code className="bg-background rounded px-2 py-1.5 text-xs break-all select-all">
+                            {apiKey}
+                        </code>
+                        <Button
+                            size="xs"
+                            variant="ghost"
+                            className="self-start"
+                            onClick={() => navigator.clipboard.writeText(apiKey)}
+                        >
+                            Copy
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+            ) : hasKey ? (
+                <div className="flex flex-col gap-2">
+                    <p className="text-muted-foreground text-xs font-medium">Current key</p>
+                    <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                        <code className="flex-1 text-xs">{maskedKey ?? '••••••••••••••••'}</code>
+                    </div>
+                </div>
+            ) : null}
+
+            <div className="flex gap-2">
+                <Button
+                    size="sm"
+                    rounded="full"
+                    onClick={generateKey}
+                    disabled={isLoading}
+                >
+                    {hasKey ? 'Regenerate Key' : 'Generate API Key'}
+                </Button>
+                {hasKey && (
+                    <Button
+                        size="sm"
+                        rounded="full"
+                        variant="bordered"
+                        onClick={revokeKey}
+                        disabled={isLoading}
+                    >
+                        Revoke Key
+                    </Button>
+                )}
+            </div>
+
+            <div className="border-t border-dashed pt-4">
+                <p className="text-muted-foreground text-xs font-medium mb-2">Quick example</p>
+                <pre className="bg-muted overflow-x-auto rounded-lg p-3 text-xs leading-relaxed">
+                    {`curl -X POST https://delph.tech/api/v1/chat \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"gemini-flash-2.0","messages":[{"role":"user","content":"Hello!"}]}'`}
+                </pre>
             </div>
         </div>
     );

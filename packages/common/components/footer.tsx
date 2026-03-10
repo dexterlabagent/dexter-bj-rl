@@ -24,7 +24,7 @@ export const Footer = () => {
         },
     ];
     return (
-        <div className="flex w-full flex-row items-center justify-center gap-4 p-3">
+        <div className="flex w-full flex-row flex-wrap items-center justify-center gap-2 sm:gap-4 p-3">
             {links.map(link => (
                 <Link
                     key={link.href}

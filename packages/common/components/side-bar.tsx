@@ -1,7 +1,6 @@
 'use client';
-import { useClerk, useUser } from '@clerk/nextjs';
-import { FullPageLoader, HistoryItem, Logo } from '@repo/common/components';
-import { useRootContext } from '@repo/common/context';
+import { FullPageLoader, HistoryItem } from '@repo/common/components';
+import { useAuth, useRootContext, useUser } from '@repo/common/context';
 import { useAppStore, useChatStore } from '@repo/common/store';
 import { Thread } from '@repo/shared/types';
 import {
@@ -13,10 +12,12 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     Flex,
+    Tooltip,
 } from '@repo/ui';
 import {
     IconArrowBarLeft,
     IconArrowBarRight,
+    IconCode,
     IconCommand,
     IconLogout,
     IconPinned,
@@ -25,12 +26,15 @@ import {
     IconSelector,
     IconSettings,
     IconSettings2,
+    IconSparkles,
     IconUser,
 } from '@tabler/icons-react';
 import { motion } from 'framer-motion';
 import moment from 'moment';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 export const Sidebar = () => {
     const { threadId: currentThreadId } = useParams();
@@ -45,7 +49,7 @@ export const Sidebar = () => {
     };
 
     const { isSignedIn, user } = useUser();
-    const { openUserProfile, signOut, redirectToSignIn } = useClerk();
+    const { signOut, walletAddress } = useAuth();
     const clearAllThreads = useChatStore(state => state.clearAllThreads);
     const setIsSidebarOpen = useAppStore(state => state.setIsSidebarOpen);
     const isSidebarOpen = useAppStore(state => state.isSidebarOpen);
@@ -135,14 +139,20 @@ export const Sidebar = () => {
                             animate={{ opacity: 1 }}
                             transition={{ duration: 0.3, delay: 0.2 }}
                             className={cn(
-                                'flex h-8 w-full cursor-pointer items-center justify-start gap-1.5 px-4',
+                                'flex h-8 w-full cursor-pointer items-center justify-start gap-2 px-4',
                                 !isSidebarOpen && 'justify-center px-0'
                             )}
                         >
-                            <Logo className="text-brand size-5" />
+                            <Image
+                                src="/delph-logo.png"
+                                alt="Delph"
+                                width={20}
+                                height={20}
+                                className="h-5 w-auto shrink-0 object-contain"
+                            />
                             {isSidebarOpen && (
                                 <p className="font-clash text-foreground text-lg font-bold tracking-wide">
-                                    llmchat.co
+                                    Delph
                                 </p>
                             )}
                         </motion.div>
@@ -232,28 +242,42 @@ export const Sidebar = () => {
                     direction="col"
                     gap="xs"
                     className={cn(
-                        'border-hard mt-3 w-full  justify-center border-t border-dashed px-3 py-2',
+                        'border-hard mt-3 w-full justify-center border-t px-3 py-2',
                         !isSidebarOpen && 'items-center justify-center px-0'
                     )}
                 >
-                    {/* <Link href="/recent" className={isSidebarOpen ? 'w-full' : ''}>
+                    <Link href="/characters" className={isSidebarOpen ? 'w-full' : ''}>
                         <Button
-                            size={isSidebarOpen ? 'xs' : 'icon-sm'}
-                            variant="bordered"
+                            size={isSidebarOpen ? 'sm' : 'icon-sm'}
+                            variant={pathname === '/characters' ? 'secondary' : 'ghost'}
                             rounded="lg"
-                            tooltip={isSidebarOpen ? undefined : 'Recent'}
+                            tooltip={isSidebarOpen ? undefined : 'Characters'}
                             tooltipSide="right"
                             className={cn(
-                                'text-muted-foreground w-full justify-start',
-                                !isSidebarOpen && 'w-auto justify-center'
+                                isSidebarOpen && 'relative w-full',
+                                'text-muted-foreground justify-start'
                             )}
                         >
-                            <IconHistory size={14} strokeWidth={2} />
-                            {isSidebarOpen && 'Recent'}
-                            {isSidebarOpen && <span className="inline-flex flex-1" />}
-                            {isSidebarOpen && <IconChevronRight size={14} strokeWidth={2} />}
+                            <IconSparkles size={14} strokeWidth={2} />
+                            {isSidebarOpen && 'Characters'}
                         </Button>
-                    </Link> */}
+                    </Link>
+                    <Link href="/developer-api" className={isSidebarOpen ? 'w-full' : ''}>
+                        <Button
+                            size={isSidebarOpen ? 'sm' : 'icon-sm'}
+                            variant={pathname.startsWith('/developer-api') ? 'secondary' : 'ghost'}
+                            rounded="lg"
+                            tooltip={isSidebarOpen ? undefined : 'API'}
+                            tooltipSide="right"
+                            className={cn(
+                                isSidebarOpen && 'relative w-full',
+                                'text-muted-foreground justify-start'
+                            )}
+                        >
+                            <IconCode size={14} strokeWidth={2} />
+                            {isSidebarOpen && 'API'}
+                        </Button>
+                    </Link>
                 </Flex>
 
                 {false ? (
@@ -294,7 +318,7 @@ export const Sidebar = () => {
 
                 <Flex
                     className={cn(
-                        'from-tertiary via-tertiary/95 absolute bottom-0 mt-auto w-full items-center bg-gradient-to-t via-60% to-transparent p-2 pt-12',
+                        'from-secondary via-secondary/95 absolute bottom-0 mt-auto w-full items-center bg-gradient-to-t via-60% to-transparent p-2 pt-12',
                         isSidebarOpen && 'items-start justify-between'
                     )}
                     gap="xs"
@@ -364,10 +388,15 @@ export const Sidebar = () => {
                                     Log in
                                 </DropdownMenuItem>
                             )} */}
-                                {isSignedIn && (
-                                    <DropdownMenuItem onClick={() => openUserProfile()}>
+                                {isSignedIn && walletAddress && (
+                                    <DropdownMenuItem
+                                        onClick={async () => {
+                                            await navigator.clipboard.writeText(walletAddress);
+                                            toast.success('Wallet address copied');
+                                        }}
+                                    >
                                         <IconUser size={16} strokeWidth={2} />
-                                        Profile
+                                        Copy wallet address
                                     </DropdownMenuItem>
                                 )}
                                 {isSignedIn && (

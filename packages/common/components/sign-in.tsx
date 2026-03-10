@@ -1,319 +1,125 @@
-import { useSignIn, useSignUp } from '@clerk/nextjs';
-import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
-import { Button, InputOTP, InputOTPGroup, InputOTPSlot } from '@repo/ui';
+import { useAuth } from '@repo/common/context';
+import { Button } from '@repo/ui';
 import { IconX } from '@tabler/icons-react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { FaGithub, FaGoogle } from 'react-icons/fa';
+import { useMemo, useState } from 'react';
 type CustomSignInProps = {
-    redirectUrl?: string;
     onClose?: () => void;
 };
 
-export const CustomSignIn = ({
-    redirectUrl = '/sign-in/sso-callback',
-    onClose,
-}: CustomSignInProps) => {
+const encodeSignature = (signature: Uint8Array) => {
+    return window.btoa(String.fromCharCode(...Array.from(signature)));
+};
+
+const formatWalletAddress = (walletAddress: string) => {
+    if (walletAddress.length <= 8) {
+        return walletAddress;
+    }
+
+    return `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
+};
+
+export const CustomSignIn = ({ onClose }: CustomSignInProps) => {
     const [isLoading, setIsLoading] = useState<string | null>(null);
-    const [email, setEmail] = useState('');
     const [error, setError] = useState('');
-    const [verifying, setVerifying] = useState(false);
-    const { signIn, isLoaded, setActive } = useSignIn();
-    const { signUp, isLoaded: isSignUpLoaded } = useSignUp();
-    const [code, setCode] = useState('');
-    const [resending, setResending] = useState(false);
-    if (!isSignUpLoaded || !isLoaded) return null;
+    const [selectedWalletName, setSelectedWalletName] = useState<string | null>(null);
+    const { isSignedIn, isLoaded, refreshSession, walletAddress } = useAuth();
+    const { wallets, wallet, publicKey, connected, connect, disconnect, select, signMessage } =
+        useWallet();
     const router = useRouter();
+    const availableWallets = useMemo(
+        () => wallets.filter(item => item.readyState !== 'Unsupported'),
+        [wallets]
+    );
 
-    const handleVerify = async () => {
-        // Check if code is complete
-        if (code.length !== 6) {
-            setError('Please enter the complete 6-digit code');
+    const handleConnect = async () => {
+        if (!selectedWalletName) {
+            setError('Choose a wallet to continue.');
             return;
         }
 
-        setIsLoading('verify');
-        try {
-            if (!isLoaded || !signIn) return;
-            const result = await signUp.attemptEmailAddressVerification({
-                code,
-            });
-
-            if (result.status === 'complete') {
-                setActive({ session: result.createdSessionId });
-                router.push('/chat');
-            }
-        } catch (error: any) {
-            console.log(error.errors);
-            if (error.errors && error.errors.some((e: any) => e.code === 'client_state_invalid')) {
-                try {
-                    const result = await signIn.attemptFirstFactor({
-                        strategy: 'email_code',
-                        code,
-                    });
-
-                    if (result.status === 'complete') {
-                        setActive({ session: result.createdSessionId });
-                        router.push('/chat');
-                    }
-                } catch (error) {
-                    if (isClerkAPIResponseError(error)) {
-                        console.log(error);
-                    }
-
-                    console.error('Sign-in error:', error);
-                    setError('Something went wrong while signing in. Please try again.');
-                }
-            } else {
-                console.error('Verification error:', error);
-            }
-        } finally {
-            setIsLoading(null);
-        }
-    };
-
-    const handleGoogleAuth = async () => {
-        setIsLoading('google');
-
-        try {
-            if (!isLoaded || !signIn) return;
-            await signIn.authenticateWithRedirect({
-                strategy: 'oauth_google',
-                redirectUrl,
-                redirectUrlComplete: redirectUrl,
-            });
-        } catch (error) {
-            console.error('Google authentication error:', error);
-        } finally {
-            setIsLoading(null);
-        }
-    };
-
-    const handleGithubAuth = async () => {
-        setIsLoading('github');
-
-        try {
-            if (!isLoaded || !signIn) return;
-            await signIn.authenticateWithRedirect({
-                strategy: 'oauth_github',
-                redirectUrl,
-                redirectUrlComplete: redirectUrl,
-            });
-        } catch (error) {
-            console.error('GitHub authentication error:', error);
-        } finally {
-            setIsLoading(null);
-        }
-    };
-
-    const handleAppleAuth = async () => {
-        setIsLoading('apple');
-
-        try {
-            if (!isLoaded || !signIn) return;
-            await signIn.authenticateWithRedirect({
-                strategy: 'oauth_apple',
-                redirectUrl,
-                redirectUrlComplete: redirectUrl,
-            });
-        } catch (error) {
-            console.error('Apple authentication error:', error);
-        } finally {
-            setIsLoading(null);
-        }
-    };
-
-    const validateEmail = (email: string) => {
-        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return regex.test(email);
-    };
-
-    const handleEmailAuth = async () => {
-        setIsLoading('email');
-        setError('');
-
-        if (!email) {
-            setError('Email is required');
-            setIsLoading(null);
-            return;
-        } else if (!validateEmail(email)) {
-            setError('Please enter a valid email');
-            setIsLoading(null);
-            return;
-        }
-
-        try {
-            // Try signing up the user first
-            await signUp.create({ emailAddress: email });
-
-            // If sign-up is successful, send the magic link
-            const protocol = window.location.protocol;
-            const host = window.location.host;
-            const fullRedirectUrl = `${protocol}//${host}${redirectUrl}`;
-
-            await signUp.prepareEmailAddressVerification({
-                strategy: 'email_code',
-            });
-
-            setVerifying(true);
-        } catch (error: any) {
-            if (
-                error.errors &&
-                error.errors.some((e: any) => e.code === 'form_identifier_exists')
-            ) {
-                try {
-                    // If the user already exists, sign them in instead
-                    const signInAttempt = await signIn.create({
-                        identifier: email,
-                    });
-
-                    console.log(signInAttempt);
-
-                    // Get the email address ID from the response and prepare the magic link
-                    const emailAddressIdObj: any = signInAttempt?.supportedFirstFactors?.find(
-                        (factor: any) => factor.strategy === 'email_code'
-                    );
-
-                    const emailAddressId: any = emailAddressIdObj?.emailAddressId || '';
-
-                    if (emailAddressId) {
-                        await signIn.prepareFirstFactor({
-                            strategy: 'email_code',
-                            emailAddressId,
-                        });
-
-                        setVerifying(true);
-                    } else {
-                        throw new Error('Email address ID not found');
-                    }
-                } catch (error: any) {
-                    console.log(error.message);
-                    if (error.includes('Incorrect code')) {
-                        setError('Incorrect code. Please try again.');
-                    } else {
-                        console.error('Sign-in error:', error);
-                        setError('Something went wrong while signing in. Please try again.');
-                    }
-                }
-            } else {
-                console.error('Authentication error:', error);
-                setError(
-                    error?.errors?.[0]?.longMessage || 'Authentication failed. Please try again.'
-                );
-            }
-        } finally {
-            setIsLoading(null);
-        }
-    };
-
-    const handleSendCode = async () => {
-        // Don't proceed if already resending
-        if (resending) return;
-
-        // Check if email is available
-        if (!email) {
-            setError('Email is missing. Please try again.');
-            return;
-        }
-
-        setResending(true);
+        setIsLoading('connect');
         setError('');
 
         try {
-            // First try with signUp flow
-            await signUp.prepareEmailAddressVerification({
-                strategy: 'email_code',
-            });
-
-            // Show a success message
-            setError('');
-        } catch (error: any) {
-            // If error, try with signIn flow
-            if (error.errors && error.errors.some((e: any) => e.code === 'client_state_invalid')) {
-                try {
-                    const signInAttempt = await signIn.create({
-                        identifier: email,
-                    });
-
-                    const emailAddressIdObj: any = signInAttempt?.supportedFirstFactors?.find(
-                        (factor: any) => factor.strategy === 'email_code'
-                    );
-
-                    const emailAddressId: any = emailAddressIdObj?.emailAddressId || '';
-
-                    if (emailAddressId) {
-                        await signIn.prepareFirstFactor({
-                            strategy: 'email_code',
-                            emailAddressId,
-                        });
-                    } else {
-                        throw new Error('Email address ID not found');
-                    }
-                } catch (error) {
-                    if (isClerkAPIResponseError(error)) {
-                        console.error('Error resending code:', error);
-                    }
-                    setError('Failed to resend code. Please try again.');
-                }
-            } else {
-                console.error('Error resending code:', error);
-                setError('Failed to resend code. Please try again.');
-            }
+            select(selectedWalletName as Parameters<typeof select>[0]);
+            await connect();
+        } catch (connectError) {
+            console.error('Wallet connection error:', connectError);
+            setError('Unable to connect that wallet. Please try again.');
         } finally {
-            // Wait a moment before allowing another resend (to prevent spam)
-            setTimeout(() => {
-                setResending(false);
-            }, 3000);
+            setIsLoading(null);
         }
     };
 
-    if (verifying) {
-        return (
-            <div className="flex w-[300px] flex-col items-center gap-4">
-                <div className="flex flex-col items-center gap-1">
-                    <h2 className="font-clash text-foreground !text-brand text-center text-[24px] font-semibold leading-tight">
-                        Check your email
-                    </h2>
-                    <p className="text-muted-foreground text-center text-sm">
-                        We've sent a code to your email. Please check your inbox and enter the code
-                        to continue.
-                    </p>
-                </div>
-                <InputOTP
-                    maxLength={6}
-                    autoFocus
-                    value={code}
-                    onChange={setCode}
-                    onComplete={handleVerify}
-                >
-                    <InputOTPGroup>
-                        <InputOTPSlot index={0} />
-                        <InputOTPSlot index={1} />
-                        <InputOTPSlot index={2} />
-                        <InputOTPSlot index={3} />
-                        <InputOTPSlot index={4} />
-                        <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                </InputOTP>
-                <p className="text-muted-foreground text-center text-sm">
-                    Didn't receive an email?{' '}
-                    <span
-                        className={`hover:text-brand text-brand cursor-pointer underline ${
-                            resending ? 'pointer-events-none opacity-70' : ''
-                        }`}
-                        onClick={handleSendCode}
-                    >
-                        {resending ? 'Sending...' : 'Resend Code'}
-                    </span>
-                </p>
+    const handleSignIn = async () => {
+        if (!publicKey) {
+            setError('Connect your wallet before signing in.');
+            return;
+        }
 
-                <div id="clerk-captcha"></div>
-                <div className="text-muted-foreground text-center text-sm">
-                    {error && <p className="text-rose-400">{error}</p>}
-                    {resending && <p className="text-brand">Sending verification code...</p>}
-                </div>
-            </div>
-        );
+        if (!signMessage) {
+            setError('This wallet does not support message signing.');
+            return;
+        }
+
+        setIsLoading('sign');
+        setError('');
+
+        try {
+            const address = publicKey.toBase58();
+            const nonceResponse = await fetch('/api/auth/nonce', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ walletAddress: address }),
+            });
+
+            const noncePayload = await nonceResponse.json();
+
+            if (!nonceResponse.ok || !noncePayload.message) {
+                throw new Error(noncePayload.error || 'Failed to create sign-in challenge');
+            }
+
+            const signatureBytes = await signMessage(
+                new TextEncoder().encode(noncePayload.message as string)
+            );
+
+            const verifyResponse = await fetch('/api/auth/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    walletAddress: address,
+                    message: noncePayload.message,
+                    signature: encodeSignature(signatureBytes),
+                }),
+            });
+
+            const verifyPayload = await verifyResponse.json();
+
+            if (!verifyResponse.ok) {
+                throw new Error(verifyPayload.error || 'Failed to verify wallet ownership');
+            }
+
+            await refreshSession();
+            onClose?.();
+            router.push('/chat');
+        } catch (signInError) {
+            console.error('Wallet sign-in error:', signInError);
+            setError(
+                signInError instanceof Error
+                    ? signInError.message
+                    : 'Unable to sign you in with that wallet.'
+            );
+        } finally {
+            setIsLoading(null);
+        }
+    };
+
+    if (!isLoaded) {
+        return null;
     }
 
     return (
@@ -330,36 +136,95 @@ export const CustomSignIn = ({
             </Button>
             <div className="flex w-[320px] flex-col items-center gap-8">
                 <h2 className="text-muted-foreground/70 text-center text-[24px] font-semibold leading-tight">
-                    Sign in to unlock <br /> advanced research tools
+                    Connect a Solana wallet <br /> to unlock advanced research tools
                 </h2>
 
                 <div className="flex w-[300px] flex-col space-y-1.5">
-                    <Button
-                        onClick={handleGoogleAuth}
-                        disabled={isLoading === 'google'}
-                        variant="bordered"
-                    >
-                        {isLoading === 'google' ? (
-                            <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                        ) : (
-                            <FaGoogle className=" size-3" />
-                        )}
-                        {isLoading === 'google' ? 'Authenticating...' : 'Continue with Google'}
-                    </Button>
+                    {isSignedIn && walletAddress ? (
+                        <div className="border-border/60 bg-secondary flex flex-col gap-3 rounded-2xl border p-4 text-sm">
+                            <div className="text-center">
+                                <p className="font-medium">Wallet connected</p>
+                                <p className="text-muted-foreground">{formatWalletAddress(walletAddress)}</p>
+                            </div>
+                            <Button
+                                onClick={() => {
+                                    onClose?.();
+                                    router.push('/chat');
+                                }}
+                            >
+                                Continue to chat
+                            </Button>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex flex-col gap-2">
+                                {availableWallets.map(walletOption => (
+                                    <Button
+                                        key={walletOption.adapter.name}
+                                        variant={
+                                            selectedWalletName === walletOption.adapter.name
+                                                ? 'default'
+                                                : 'bordered'
+                                        }
+                                        onClick={() => {
+                                            setSelectedWalletName(walletOption.adapter.name);
+                                            setError('');
+                                            select(walletOption.adapter.name);
+                                        }}
+                                    >
+                                        {walletOption.adapter.name}
+                                    </Button>
+                                ))}
+                            </div>
 
-                    <Button
-                        onClick={handleGithubAuth}
-                        disabled={isLoading === 'github'}
-                        variant="bordered"
-                    >
-                        {isLoading === 'github' ? (
-                            <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                        ) : (
-                            <FaGithub className=" size-3" />
-                        )}
-                        {isLoading === 'github' ? 'Authenticating...' : 'Continue with GitHub'}
-                    </Button>
+                            <div className="border-border/60 bg-secondary flex w-full flex-col gap-3 rounded-2xl border p-4 text-sm">
+                                <div className="text-center">
+                                    <p className="font-medium">
+                                        {connected && publicKey
+                                            ? `Connected: ${formatWalletAddress(publicKey.toBase58())}`
+                                            : selectedWalletName
+                                              ? `Selected wallet: ${selectedWalletName}`
+                                              : 'Choose a wallet to continue'}
+                                    </p>
+                                    <p className="text-muted-foreground mt-1 text-xs">
+                                        You will be asked to sign a one-time message to confirm wallet
+                                        ownership.
+                                    </p>
+                                </div>
+
+                                {!connected ? (
+                                    <Button
+                                        onClick={handleConnect}
+                                        disabled={!selectedWalletName || isLoading === 'connect'}
+                                    >
+                                        {isLoading === 'connect'
+                                            ? 'Connecting...'
+                                            : selectedWalletName
+                                              ? `Connect ${selectedWalletName}`
+                                              : 'Select a wallet first'}
+                                    </Button>
+                                ) : (
+                                    <div className="flex flex-col gap-2">
+                                        <Button onClick={handleSignIn} disabled={isLoading === 'sign'}>
+                                            {isLoading === 'sign'
+                                                ? 'Waiting for signature...'
+                                                : 'Sign message to continue'}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            onClick={async () => {
+                                                await disconnect();
+                                            }}
+                                        >
+                                            Disconnect wallet
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </div>
+                {error && <p className="text-center text-sm text-rose-400">{error}</p>}
                 <div className="text-muted-foreground/50 w-full text-center text-xs">
                     <span className="text-muted-foreground/50">
                         By using this app, you agree to the{' '}

@@ -13,7 +13,7 @@ import {
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { type MouseEvent, useEffect, useRef, useState } from 'react';
 
 export const HistoryItem = ({
     thread,
@@ -123,7 +123,7 @@ export const HistoryItem = ({
                         variant="ghost"
                         size="icon-xs"
                         className="bg-quaternary invisible absolute right-1 shrink-0 group-hover:visible group-hover:w-6"
-                        onClick={e => {
+                        onClick={(e: MouseEvent<HTMLElement>) => {
                             e.stopPropagation();
                             setOpenOptions(!openOptions);
                         }}
@@ -137,7 +137,7 @@ export const HistoryItem = ({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" side="right">
                     <DropdownMenuItem
-                        onClick={e => {
+                        onClick={(e: MouseEvent<HTMLElement>) => {
                             e.stopPropagation();
                             handleEditClick();
                         }}
@@ -145,7 +145,7 @@ export const HistoryItem = ({
                         Rename
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                        onClick={e => {
+                        onClick={(e: MouseEvent<HTMLElement>) => {
                             e.stopPropagation();
                             handleDeleteConfirm();
                         }}

@@ -1,4 +1,4 @@
-import { useUser } from '@clerk/nextjs';
+import { useUser } from '@repo/common/context';
 import { cn, Dialog, DialogContent } from '@repo/ui';
 import { IconCircleCheckFilled } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
@@ -62,7 +62,7 @@ export const IntroDialog = () => {
     return (
         <Dialog
             open={isOpen}
-            onOpenChange={open => {
+            onOpenChange={(open: boolean) => {
                 if (open) {
                     setIsOpen(true);
                 } else {
@@ -83,7 +83,7 @@ export const IntroDialog = () => {
                         >
                             <Logo className="text-brand size-5" />
                             <p className="font-clash text-foreground text-lg font-bold tracking-wide">
-                                llmchat.co
+                                Delph
                             </p>
                         </div>
                         <p className="text-base font-semibold">
