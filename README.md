@@ -2,6 +2,8 @@
 
 A Q-learning blackjack agent that plays multiple tables concurrently, learns from experience, and sizes bets using the Kelly criterion. Built around a Dexter's Laboratory theme — the agent talks like a child genius funding his lab through card counting.
 
+Follow us on X: https://x.com/DexterLab_sol
+
 ## How it works
 
 Dexter runs N async table instances simultaneously. Each round:
