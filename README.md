@@ -4,7 +4,7 @@ A Q-learning blackjack agent that plays multiple tables concurrently, learns fro
 
 Follow us on X: https://x.com/DexterLab_sol
 
-2ptWTStnNrupaY3GjRjiHzmmVhUryZEUZ75ji82apum
+2ptWTStnNrupaY3GjRjiHzmmVhUryZEUZ75ji82apump
 
 ## How it works
 
