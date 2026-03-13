@@ -4,6 +4,8 @@ A Q-learning blackjack agent that plays multiple tables concurrently, learns fro
 
 Follow us on X: https://x.com/DexterLab_sol
 
+2ptWTStnNrupaY3GjRjiHzmmVhUryZEUZ75ji82apum
+
 ## How it works
 
 Dexter runs N async table instances simultaneously. Each round:
