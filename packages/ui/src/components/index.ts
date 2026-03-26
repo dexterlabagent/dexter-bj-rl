@@ -17,7 +17,6 @@ export * from './hover-card';
 export * from './input';
 export * from './kbd';
 export * from './label-divider';
-export * from './link-block';
 export * from './loading-spinner';
 export * from './popover';
 export * from './radio-group';

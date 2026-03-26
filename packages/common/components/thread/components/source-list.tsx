@@ -1,5 +1,5 @@
 import { Source } from '@repo/shared/types';
-import { WebsitePreview } from '@repo/ui';
+import { WebsitePreview } from '../../website-preview';
 
 export const SourceList = ({ sources }: { sources: Source[] }) => {
     if (!sources || !Array.isArray(sources) || sources?.length === 0) {
