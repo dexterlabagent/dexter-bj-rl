@@ -2,7 +2,7 @@ export const termsMdx = `
 ### Terms and Conditions
 --------------------------------
 
-Last Updated: August 10, 2024
+Last Updated: March 26, 2026
 
 Welcome to delph.tech! These Terms and Conditions ("Terms") govern your use of the delph.tech website and services (the "Service"). By accessing or using our Service, you agree to be bound by these Terms. If you do not agree with any part of these Terms, you must not use the Service.
 
