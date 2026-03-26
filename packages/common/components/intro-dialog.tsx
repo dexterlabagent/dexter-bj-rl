@@ -3,7 +3,6 @@ import { cn, Dialog, DialogContent } from '@repo/ui';
 import { IconCircleCheckFilled } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Logo } from './logo';
 export const IntroDialog = () => {
     const [isOpen, setIsOpen] = useState(false);
     const { isSignedIn } = useUser();
@@ -81,7 +80,6 @@ export const IntroDialog = () => {
                                 'flex h-8 w-full cursor-pointer items-center justify-start gap-1.5 '
                             )}
                         >
-                            <Logo className="text-brand size-5" />
                             <p className="font-clash text-foreground text-lg font-bold tracking-wide">
                                 Delph
                             </p>
