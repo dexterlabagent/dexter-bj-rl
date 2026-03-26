@@ -19,6 +19,7 @@ import {
     IconArrowBarRight,
     IconBrandGithub,
     IconBrandX,
+    IconChartBar,
     IconCode,
     IconCommand,
     IconLogout,
@@ -262,6 +263,22 @@ export const Sidebar = () => {
                         >
                             <IconSparkles size={14} strokeWidth={2} />
                             {isSidebarOpen && 'Characters'}
+                        </Button>
+                    </Link>
+                    <Link href="/token" className={isSidebarOpen ? 'w-full' : ''}>
+                        <Button
+                            size={isSidebarOpen ? 'sm' : 'icon-sm'}
+                            variant={pathname === '/token' ? 'secondary' : 'ghost'}
+                            rounded="lg"
+                            tooltip={isSidebarOpen ? undefined : 'Token'}
+                            tooltipSide="right"
+                            className={cn(
+                                isSidebarOpen && 'relative w-full',
+                                'text-muted-foreground justify-start'
+                            )}
+                        >
+                            <IconChartBar size={14} strokeWidth={2} />
+                            {isSidebarOpen && 'Token'}
                         </Button>
                     </Link>
                     <Link href="/developer-api" className={isSidebarOpen ? 'w-full' : ''}>
