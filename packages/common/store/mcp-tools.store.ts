@@ -4,17 +4,22 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
+export type McpServerConfig = {
+    url: string;
+    headers?: Record<string, string>;
+};
+
 type McpState = {
-    mcpConfig: Record<string, string>;
+    mcpConfig: Record<string, McpServerConfig>;
     selectedMCP: string[];
 };
 
 type McpActions = {
-    setMcpConfig: (mcpConfig: Record<string, string>) => void;
-    addMcpConfig: (mcpConfig: Record<string, string>) => void;
+    setMcpConfig: (mcpConfig: Record<string, McpServerConfig>) => void;
+    addMcpConfig: (name: string, config: McpServerConfig) => void;
     removeMcpConfig: (key: string) => void;
-    getMcpConfig: () => Record<string, string>;
-    getSelectedMCP: () => Record<string, string>;
+    getMcpConfig: () => Record<string, McpServerConfig>;
+    getSelectedMCP: () => Record<string, McpServerConfig>;
     updateSelectedMCP: (updater: (prev: string[]) => string[]) => void;
 };
 
@@ -28,10 +33,12 @@ export const useMcpToolsStore = create<McpState & McpActions>()(
                 const mcpConfig = get().mcpConfig;
                 return selectedMCP.reduce(
                     (acc, mcp) => {
-                        acc[mcp] = mcpConfig[mcp];
+                        if (mcpConfig[mcp]) {
+                            acc[mcp] = mcpConfig[mcp];
+                        }
                         return acc;
                     },
-                    {} as Record<string, string>
+                    {} as Record<string, McpServerConfig>
                 );
             },
 
@@ -41,15 +48,15 @@ export const useMcpToolsStore = create<McpState & McpActions>()(
                 });
             },
 
-            setMcpConfig: (mcpConfig: Record<string, string>) => {
+            setMcpConfig: (mcpConfig: Record<string, McpServerConfig>) => {
                 set(state => {
                     state.mcpConfig = mcpConfig;
                 });
             },
 
-            addMcpConfig: (mcpConfig: Record<string, string>) => {
+            addMcpConfig: (name: string, config: McpServerConfig) => {
                 set(state => {
-                    state.mcpConfig = { ...state.mcpConfig, ...mcpConfig };
+                    state.mcpConfig[name] = config;
                 });
             },
 

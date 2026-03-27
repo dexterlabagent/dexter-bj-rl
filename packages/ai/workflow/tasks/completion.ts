@@ -1,5 +1,6 @@
 import { createTask } from '@repo/orchestrator';
 import { getModelFromChatMode } from '../../models';
+import { buildAllTools } from '../../tools/mcp';
 import { WorkflowContextSchema, WorkflowEventSchema } from '../flow';
 import { ChunkBuffer, generateText, getHumanizedDate, handleError } from '../utils';
 
@@ -15,6 +16,7 @@ export const completionTask = createTask<WorkflowEventSchema, WorkflowContextSch
         const customInstructions = context?.get('customInstructions');
         const mode = context.get('mode');
         const webSearch = context.get('webSearch') || false;
+        const mcpConfig = context.get('mcpConfig');
 
         let messages =
             context
@@ -51,6 +53,28 @@ export const completionTask = createTask<WorkflowEventSchema, WorkflowContextSch
         Today is ${getHumanizedDate()}.
         `;
 
+        // Build MCP tools if configured
+        let mcpTools: Awaited<ReturnType<typeof buildAllTools>> | undefined;
+        const hasMcpConfig = mcpConfig && Object.keys(mcpConfig).length > 0;
+
+        if (hasMcpConfig) {
+            const appUrl =
+                (typeof self !== 'undefined' && (self as any).NEXT_PUBLIC_APP_URL) ||
+                process.env.NEXT_PUBLIC_APP_URL ||
+                '';
+
+            if (appUrl) {
+                try {
+                    mcpTools = await buildAllTools({
+                        proxyEndpoint: `${appUrl}/api/mcp/proxy`,
+                        mcpServers: mcpConfig,
+                    });
+                } catch (error) {
+                    console.error('Failed to build MCP tools:', error);
+                }
+            }
+        }
+
         const reasoningBuffer = new ChunkBuffer({
             threshold: 200,
             breakOn: ['\n\n'],
@@ -85,43 +109,69 @@ export const completionTask = createTask<WorkflowEventSchema, WorkflowContextSch
             },
         });
 
-        const response = await generateText({
-            model,
-            messages,
-            prompt,
-            signal,
-            toolChoice: 'auto',
-            maxSteps: 2,
-            onReasoning: (chunk, fullText) => {
-                reasoningBuffer.add(chunk);
-            },
-            onChunk: (chunk, fullText) => {
-                chunkBuffer.add(chunk);
-            },
-        });
-
-        reasoningBuffer.end();
-        chunkBuffer.end();
-
-        events?.update('answer', prev => ({
-            ...prev,
-            text: '',
-            fullText: response,
-            status: 'COMPLETED',
-        }));
-
-        context.update('answer', _ => response);
-
-        events?.update('status', prev => 'COMPLETED');
-
-        const onFinish = context.get('onFinish');
-        if (onFinish) {
-            onFinish({
-                answer: response,
-                threadId: context.get('threadId'),
-                threadItemId: context.get('threadItemId'),
+        try {
+            const response = await generateText({
+                model,
+                messages,
+                prompt,
+                signal,
+                tools: mcpTools?.allTools,
+                toolChoice: 'auto',
+                maxSteps: mcpTools?.allTools ? 5 : 2,
+                onReasoning: (chunk, fullText) => {
+                    reasoningBuffer.add(chunk);
+                },
+                onChunk: (chunk, fullText) => {
+                    chunkBuffer.add(chunk);
+                },
+                onToolCall: toolCall => {
+                    events?.update('toolCalls', prev => ({
+                        ...(prev || {}),
+                        [toolCall.toolCallId]: {
+                            toolCallId: toolCall.toolCallId,
+                            toolName: toolCall.toolName,
+                            args: toolCall.args,
+                        },
+                    }));
+                },
+                onToolResult: toolResult => {
+                    events?.update('toolResults', prev => ({
+                        ...(prev || {}),
+                        [toolResult.toolCallId]: {
+                            toolCallId: toolResult.toolCallId,
+                            toolName: toolResult.toolName,
+                            result: toolResult.result,
+                        },
+                    }));
+                },
             });
+
+            reasoningBuffer.end();
+            chunkBuffer.end();
+
+            events?.update('answer', prev => ({
+                ...prev,
+                text: '',
+                fullText: response,
+                status: 'COMPLETED',
+            }));
+
+            context.update('answer', _ => response);
+
+            events?.update('status', prev => 'COMPLETED');
+
+            const onFinish = context.get('onFinish');
+            if (onFinish) {
+                onFinish({
+                    answer: response,
+                    threadId: context.get('threadId'),
+                    threadItemId: context.get('threadItemId'),
+                });
+            }
+        } finally {
+            mcpTools?.onClose?.();
         }
+
         return;
     },
     onError: handleError,

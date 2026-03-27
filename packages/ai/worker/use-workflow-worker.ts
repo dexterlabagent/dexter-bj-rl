@@ -120,7 +120,7 @@ export function useWorkflowWorker(onMessage?: (data: any) => void, onAbort?: () 
         messages: (CoreUserMessage | CoreAssistantMessage)[];
         config?: WorkflowConfig;
         apiKeys?: Record<string, string>;
-        mcpConfig?: Record<string, string>;
+        mcpConfig?: Record<string, { url: string; headers?: Record<string, string> }>;
     }) => {
         // Reset state
         setError(null);

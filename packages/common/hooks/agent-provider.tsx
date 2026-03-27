@@ -442,7 +442,10 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
                     threadItemId: optimisticAiThreadItemId,
                     parentThreadItemId: '',
                     customInstructions: effectiveInstructions,
-                    apiKeys: apiKeys(),
+                    apiKeys: {
+                        ...apiKeys(),
+                        NEXT_PUBLIC_APP_URL: window.location.origin,
+                    },
                 });
             } else {
                 runAgent({

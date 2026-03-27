@@ -1,4 +1,3 @@
-// pages/api/mcp-proxy/[server]/sse.ts
 import { Redis } from '@upstash/redis';
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
@@ -8,12 +7,6 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN,
 })
 
-
-// // Configure your MCP servers
-// const MCP_SERVERS: Record<string, string> = {
-//   'hackernews': 'https://mcp.composio.dev/hackernews/rapping-bitter-psychiatrist-DjGelP',
-// };
-
 // Store sessions globally for access across requests
 declare global {
   var _mcpSessions: Record<string, string>;
@@ -21,33 +14,37 @@ declare global {
 
 global._mcpSessions = global._mcpSessions || {};
 
+/**
+ * Parse custom MCP server headers from the x-mcp-headers request header.
+ * Sent as a JSON-encoded Record<string, string>.
+ */
+function parseMcpHeaders(request: NextRequest): Record<string, string> {
+  const raw = request.headers.get('x-mcp-headers');
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
 export async function GET(request: NextRequest) {
-  const serverName = "hackernews";
-  
-  // Check if this is a message endpoint request with a sessionId
   const server = request.nextUrl.searchParams.get('server');
   if (!server) {
-    console.log(`GET request with server ${server} - should be a POST request`);
-    return NextResponse.json({ error: 'Messages should be sent using POST method' }, { status: 405 });
+    return NextResponse.json({ error: 'Missing server parameter' }, { status: 400 });
   }
-  
-  // if (!serverName || !MCP_SERVERS[serverName]) {
-  //   return NextResponse.json({ error: `MCP server '${serverName}' not found` }, { status: 404 });
-  // }
 
-  // Generate a new session ID for this connection
+  const mcpHeaders = parseMcpHeaders(request);
   const newSessionId = randomUUID();
-  
-  // Store the session for later reference
-  global._mcpSessions[newSessionId] = serverName;
-  console.log(`Created session ${newSessionId} for server ${serverName}`);
-  
+  global._mcpSessions[newSessionId] = server;
+
   try {
     const targetUrl = `${server}`;
     const response = await fetch(targetUrl, {
       method: 'GET',
       headers: {
         ...Object.fromEntries(request.headers),
+        ...mcpHeaders,
         host: new URL(server).host,
       },
     });
@@ -65,14 +62,12 @@ export async function GET(request: NextRequest) {
         if (done) {
           controller.close();
           delete global._mcpSessions[newSessionId];
-          console.log(`Session ${newSessionId} closed normally`);
           return;
         }
 
         const chunkString = decoder.decode(value, { stream: true });
         const sessionId = chunkString.match(/sessionId=([^&]+)/)?.[1];
         if (sessionId) {
-          console.log(`Setting session ${sessionId} for server ${serverName}`);
           await redis.set(`mcp:session:${sessionId}`, server);
         }
         controller.enqueue(value);
@@ -80,7 +75,6 @@ export async function GET(request: NextRequest) {
       cancel() {
         reader.cancel();
         delete global._mcpSessions[newSessionId];
-        console.log(`Session ${newSessionId} canceled`);
       }
     });
 
@@ -91,7 +85,7 @@ export async function GET(request: NextRequest) {
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, x-mcp-headers, x-base-url',
       },
     });
   } catch (error) {
@@ -102,50 +96,28 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-        console.log("request", request);
-        
   const server = request.nextUrl.searchParams.get('server');
-  
+
   if (!server) {
-    console.error('POST request - Missing server parameter');
     return NextResponse.json(
       {
         jsonrpc: "2.0",
         error: { code: -32602, message: "Missing server parameter" },
         id: null
-      }, 
+      },
       { status: 400 }
     );
   }
-  
-  // Get the server name from the stored session
-  const serverName = 'hackernews'
 
-  console.log("serverName", serverName);
-  
-//   if (!serverName || !MCP_SERVERS[serverName]) {
-//     console.error(`POST request - Invalid session ${sessionId} or server ${serverName}`);
-//     return NextResponse.json(
-//       {
-//         jsonrpc: "2.0",
-//         error: { code: -32602, message: "Invalid session" },
-//         id: null
-//       }, 
-//       { status: 404 }
-//     );
-//   }
-
+  const mcpHeaders = parseMcpHeaders(request);
   const targetUrl = `${server}`;
-  console.log(`Forwarding JSONRPC POST to: ${targetUrl}`);
-  
+
   try {
     let jsonRpcRequest;
     try {
       const body = await request.text();
       jsonRpcRequest = JSON.parse(body);
-      console.log(`JSONRPC Request:`, jsonRpcRequest);
-      
-      // Validate basic JSONRPC structure
+
       if (!jsonRpcRequest.jsonrpc || jsonRpcRequest.jsonrpc !== "2.0" || !jsonRpcRequest.method) {
         throw new Error("Invalid JSONRPC request");
       }
@@ -160,19 +132,19 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...mcpHeaders,
         host: new URL(server).host,
       },
       body: JSON.stringify(jsonRpcRequest),
     });
 
     const responseText = await response.text();
-    console.log(`JSONRPC response status: ${response.status}, body: ${responseText}`);
-    
+
     let jsonResponse;
     try {
       jsonResponse = JSON.parse(responseText);
@@ -184,12 +156,12 @@ export async function POST(request: NextRequest) {
         id: jsonRpcRequest.id || null
       };
     }
-    
+
     return NextResponse.json(jsonResponse, {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, x-mcp-headers, x-base-url',
       },
     });
   } catch (error) {
@@ -199,7 +171,7 @@ export async function POST(request: NextRequest) {
         jsonrpc: "2.0",
         error: { code: -32603, message: "Internal error" },
         id: null
-      }, 
+      },
       { status: 500 }
     );
   }
@@ -211,7 +183,7 @@ export async function OPTIONS(request: NextRequest) {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, x-mcp-headers, x-base-url',
     },
   });
 }

@@ -41,8 +41,8 @@ export type WorkflowEventSchema = {
             status: Status;
         }
     >;
-    toolCalls?: any[];
-    toolResults?: any[];
+    toolCalls?: Record<string, any>;
+    toolResults?: Record<string, any>;
 
     answer: {
         text?: string;
@@ -68,7 +68,7 @@ export type WorkflowEventSchema = {
 
 // Define the context schema type
 export type WorkflowContextSchema = {
-    mcpConfig: Record<string, string>;
+    mcpConfig: Record<string, { url: string; headers?: Record<string, string> }>;
     question: string;
     search_queries: string[];
     messages: CoreMessage[];
@@ -121,7 +121,7 @@ export const runWorkflow = ({
     customInstructions,
     gl,
 }: {
-    mcpConfig: Record<string, string>;
+    mcpConfig: Record<string, { url: string; headers?: Record<string, string> }>;
     mode: ChatMode;
     question: string;
     threadId: string;
@@ -150,8 +150,8 @@ export const runWorkflow = ({
     // Create typed event emitter with the proper type
     const events = createTypedEventEmitter<WorkflowEventSchema>({
         steps: {},
-        toolCalls: [],
-        toolResults: [],
+        toolCalls: {},
+        toolResults: {},
         answer: {
             text: '',
 

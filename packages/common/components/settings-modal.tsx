@@ -8,6 +8,7 @@ import {
     IconCode,
     IconKey,
     IconSettings2,
+    IconTools,
     IconTrash,
 } from '@tabler/icons-react';
 
@@ -53,11 +54,12 @@ export const SettingsModal = () => {
             key: SETTING_TABS.DEVELOPER_API,
             component: <DeveloperApiSettings />,
         },
-        // {
-        //     title: 'MCP Tools',
-        //     key: SETTING_TABS.MCP_TOOLS,
-        //     component: <MCPSettings />,
-        // },
+        {
+            icon: <IconTools size={16} strokeWidth={2} className="text-muted-foreground" />,
+            title: 'MCP Tools',
+            key: SETTING_TABS.MCP_TOOLS,
+            component: <MCPSettings />,
+        },
     ];
 
     return (
@@ -127,7 +129,7 @@ export const MCPSettings = () => {
                             <div className="flex w-full flex-row items-center gap-2">
                                 <ToolIcon /> <Badge>{key}</Badge>
                                 <p className="text-muted-foreground line-clamp-1 flex-1 text-sm">
-                                    {mcpConfig[key]}
+                                    {mcpConfig[key]?.url}
                                 </p>
                                 <Button
                                     size="xs"
@@ -182,7 +184,7 @@ export const MCPSettings = () => {
             <AddToolDialog
                 isOpen={isAddToolDialogOpen}
                 onOpenChange={setIsAddToolDialogOpen}
-                onAddTool={addMcpConfig}
+                onAddTool={(name, config) => addMcpConfig(name, config)}
             />
         </div>
     );
@@ -191,17 +193,17 @@ export const MCPSettings = () => {
 type AddToolDialogProps = {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    onAddTool: (tool: Record<string, string>) => void;
+    onAddTool: (name: string, config: { url: string; headers?: Record<string, string> }) => void;
 };
 
 const AddToolDialog = ({ isOpen, onOpenChange, onAddTool }: AddToolDialogProps) => {
     const [mcpToolName, setMcpToolName] = useState('');
     const [mcpToolUrl, setMcpToolUrl] = useState('');
+    const [mcpHeaders, setMcpHeaders] = useState<{ key: string; value: string }[]>([]);
     const [error, setError] = useState('');
     const { mcpConfig } = useMcpToolsStore();
 
     const handleAddTool = () => {
-        // Validate inputs
         if (!mcpToolName.trim()) {
             setError('Tool name is required');
             return;
@@ -212,32 +214,40 @@ const AddToolDialog = ({ isOpen, onOpenChange, onAddTool }: AddToolDialogProps) 
             return;
         }
 
-        // Check for duplicate names
         if (mcpConfig && mcpConfig[mcpToolName]) {
             setError('A tool with this name already exists');
             return;
         }
 
-        // Clear error if any
         setError('');
 
-        // Add the tool
-        onAddTool({
-            [mcpToolName]: mcpToolUrl,
+        const headers = mcpHeaders.reduce(
+            (acc, h) => {
+                if (h.key.trim() && h.value.trim()) {
+                    acc[h.key.trim()] = h.value.trim();
+                }
+                return acc;
+            },
+            {} as Record<string, string>
+        );
+
+        onAddTool(mcpToolName, {
+            url: mcpToolUrl,
+            ...(Object.keys(headers).length > 0 ? { headers } : {}),
         });
 
-        // Reset form and close dialog
         setMcpToolName('');
         setMcpToolUrl('');
+        setMcpHeaders([]);
         onOpenChange(false);
     };
 
-    // Reset error when dialog opens/closes
     const handleOpenChange = (open: boolean) => {
         if (!open) {
             setError('');
             setMcpToolName('');
             setMcpToolUrl('');
+            setMcpHeaders([]);
         }
         onOpenChange(open);
     };
@@ -258,7 +268,6 @@ const AddToolDialog = ({ isOpen, onOpenChange, onAddTool }: AddToolDialogProps) 
                             onChange={e => {
                                 const key = e.target.value?.trim().toLowerCase().replace(/ /g, '-');
                                 setMcpToolName(key);
-                                // Clear error when user types
                                 if (error) setError('');
                             }}
                         />
@@ -274,13 +283,69 @@ const AddToolDialog = ({ isOpen, onOpenChange, onAddTool }: AddToolDialogProps) 
                             value={mcpToolUrl}
                             onChange={e => {
                                 setMcpToolUrl(e.target.value);
-                                // Clear error when user types
                                 if (error) setError('');
                             }}
                         />
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium">Headers</label>
+                            <Button
+                                size="xs"
+                                variant="ghost"
+                                rounded="full"
+                                onClick={() =>
+                                    setMcpHeaders(prev => [...prev, { key: '', value: '' }])
+                                }
+                            >
+                                + Add Header
+                            </Button>
+                        </div>
                         <p className="text-muted-foreground text-xs">
-                            Example: https://your-mcp-server.com
+                            Add authentication headers if the MCP server requires an API key.
                         </p>
+                        {mcpHeaders.map((header, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                                <Input
+                                    placeholder="Header name"
+                                    value={header.key}
+                                    className="flex-1"
+                                    onChange={e => {
+                                        const updated = [...mcpHeaders];
+                                        updated[index] = { ...updated[index], key: e.target.value };
+                                        setMcpHeaders(updated);
+                                    }}
+                                />
+                                <Input
+                                    placeholder="Value"
+                                    value={header.value}
+                                    className="flex-1"
+                                    type="password"
+                                    onChange={e => {
+                                        const updated = [...mcpHeaders];
+                                        updated[index] = {
+                                            ...updated[index],
+                                            value: e.target.value,
+                                        };
+                                        setMcpHeaders(updated);
+                                    }}
+                                />
+                                <Button
+                                    size="xs"
+                                    variant="ghost"
+                                    onClick={() => {
+                                        setMcpHeaders(prev => prev.filter((_, i) => i !== index));
+                                    }}
+                                >
+                                    <IconTrash
+                                        size={14}
+                                        strokeWidth={2}
+                                        className="text-muted-foreground"
+                                    />
+                                </Button>
+                            </div>
+                        ))}
                     </div>
                 </div>
                 <DialogFooter className="border-border mt-4 border-t pt-4">

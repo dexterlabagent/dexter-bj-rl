@@ -282,7 +282,7 @@ export const ChatInput = ({
             <div
                 className={cn(
                     'mx-auto flex w-full max-w-3xl flex-col items-start',
-                    currentThreadId && 'bg-secondary',
+                    
                     !threadItemsLength && 'justify-start',
                     size === 'sm' && 'px-4 md:px-8'
                 )}

@@ -138,9 +138,9 @@ export const Steps = ({ steps, threadItem }: { steps: Step[]; threadItem: Thread
                     {steps.map((step, index) => (
                         <StepRenderer key={index} step={step} />
                     ))}
-                    {/* {toolCallAndResults.map(({ toolCall, toolResult }) => (
-                        <ToolStep toolCall={toolCall} toolResult={toolResult} />
-                    ))} */}
+                    {toolCallAndResults.map(({ toolCall, toolResult }) => (
+                        <ToolStep key={toolCall?.toolCallId} toolCall={toolCall} toolResult={toolResult} />
+                    ))}
                 </div>
             ),
         });

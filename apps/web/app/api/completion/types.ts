@@ -9,7 +9,10 @@ export const completionRequestSchema = z.object({
     messages: z.any(),
     mode: z.nativeEnum(ChatMode),
     maxIterations: z.number().optional(),
-    mcpConfig: z.record(z.string(), z.string()).optional(),
+    mcpConfig: z.record(z.string(), z.object({
+        url: z.string(),
+        headers: z.record(z.string(), z.string()).optional(),
+    })).optional(),
     webSearch: z.boolean().optional(),
     showSuggestions: z.boolean().optional(),
     customInstructions: z.string().optional(),
