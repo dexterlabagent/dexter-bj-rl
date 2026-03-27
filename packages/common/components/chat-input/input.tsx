@@ -126,7 +126,7 @@ export const ChatInput = ({
                 <Flex
                     direction="col"
                     className={cn(
-                        'bg-secondary border-border/60 shadow-subtle-sm relative z-10 w-full rounded-2xl border'
+                        'bg-background border-border/60 shadow-subtle-sm relative z-10 w-full rounded-2xl border'
                     )}
                 >
                     <ImageDropzoneRoot dropzoneProps={dropzonProps}>
@@ -270,15 +270,19 @@ export const ChatInput = ({
     return (
         <div
             className={cn(
-                'bg-secondary w-full',
+                'w-full',
                 currentThreadId
                     ? 'absolute bottom-0'
-                    : 'absolute inset-0 flex h-full w-full flex-col items-center justify-center'
+                    : ' absolute inset-0 flex h-full w-full flex-col items-center justify-center'
             )}
         >
+            {currentThreadId && (
+                <div className=" pointer-events-none h-12 w-full" />
+            )}
             <div
                 className={cn(
                     'mx-auto flex w-full max-w-3xl flex-col items-start',
+                    currentThreadId && 'bg-secondary',
                     !threadItemsLength && 'justify-start',
                     size === 'sm' && 'px-4 md:px-8'
                 )}
@@ -358,7 +362,7 @@ const AnimatedTitles = ({ titles = [] }: AnimatedTitlesProps) => {
                         duration: 0.8,
                         ease: 'easeInOut',
                     }}
-                    className="from-foreground/70 via-foreground/50 to-foreground/20 bg-gradient-to-r bg-clip-text text-center text-[32px] font-semibold tracking-tight text-transparent"
+                    className="text-foreground/50 text-center text-[32px] font-semibold tracking-tight"
                 >
                     {greeting}
                 </motion.h1>
